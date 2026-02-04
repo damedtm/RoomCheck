@@ -1,71 +1,123 @@
-# Secure Room Inspection Upload System
+# AWS Serverless Room Inspection Upload System
+
+A secure, cloud‑native web application designed to streamline university room inspection workflows.  
+The system combines a modern React frontend with a fully serverless AWS backend, enabling Resident Assistants (RAs) and Administrators to upload, review, and manage room inspection photos with reliability, scalability, and strong access control.
+
+---
 
 ## Overview
 
-The **Secure Room Inspection Upload System** is a web application that allows secure image submissions for room inspections with an administrative review workflow. The app ensures **role-based access control**, **secure storage**, and **auditability** for all uploaded images.
+The Room Inspection Upload System provides a complete workflow for capturing, storing, and reviewing room inspection images.  
+RAs submit photos and metadata, while administrators review, approve, or reject submissions through a dedicated dashboard.
 
-Students can upload images of rooms, and administrators can review, approve, or reject submissions.
+The platform emphasizes:
+
+- Role‑based access control  
+- Secure, encrypted storage  
+- Operational auditability  
+- Scalable, serverless architecture  
+- Fast, intuitive user experience  
 
 ---
 
 ## Key Features
 
-- Secure image uploads to Amazon S3
-- Role-based authentication and authorization
-- Admin-only review and approval workflow
-- Scalable and cloud-native architecture
-- Real-time upload progress and status indicators
-- Audit-friendly and organized storage
+### Core Functionality
+- Secure multi‑file image uploads to Amazon S3  
+- Real‑time upload progress indicators and client‑side validation  
+- Organized, audit‑friendly storage structure  
+- End‑to‑end serverless workflow using AWS services  
+
+### RA Dashboard
+- Multi‑file upload support with live image previews  
+- Metadata entry (dorm, room number, notes, uploader info)  
+- Real‑time validation for file size, type, and completeness  
+- Clean, responsive UI built with React + Tailwind  
+
+### Admin Dashboard
+- Review all submitted inspection reports  
+- Approve or reject submissions with status tracking  
+- Dorm‑level filtering, search, sorting, and pagination  
+- User management tools for onboarding RAs and admins  
+- Signed S3 preview URLs for secure image viewing  
+
+### User Management
+- Custom AWS Lambda + API Gateway endpoint for creating users  
+- Admin‑only role assignment (RA, Admin)  
+- Integration with Cognito User Pools and Identity Pools  
+- Temporary AWS credentials for secure, scoped access  
 
 ---
 
-## User Roles
+## Security & Reliability
 
-### Student
-
-- Log in via the web portal
-- Upload room inspection images
-- Track the status of uploads (pending, approved, rejected)
-
-### Administrator
-
-- View all submitted images
-- Approve or reject submissions
-- Manage records and metadata
-- Maintain audit logs
+- IAM least‑privilege role design  
+- CORS configuration for controlled access  
+- Encrypted S3 storage and secure presigned URLs  
+- DynamoDB for durable, scalable metadata storage  
 
 ---
 
-## Tech Stack
+## Code Quality
+
+- Modular React components  
+- Custom hooks for AWS operations and authentication  
+- Clear separation of concerns across frontend and backend  
+- Maintainable, production‑ready codebase  
+
+---
+
+## Architecture
 
 ### Frontend
-
-- **React** – Web application framework
-- **Tailwind CSS** – Styling and UI components
-- **React OIDC** – Authentication
+- **React (Vite)** – Fast, modern UI framework  
+- **Tailwind CSS** – Utility‑first styling  
 
 ### Backend / Cloud
-
-- **AWS Cognito** – Authentication and user management
-- **AWS S3** – Secure image storage
-- **AWS DynamoDB** – Metadata storage
-- **AWS IAM** – Role-based access control
-- **AWS SDK for JavaScript** – Handling uploads and database operations
+- **AWS Lambda** – Serverless compute for backend logic and user creation  
+- **Amazon API Gateway** – Secure REST API endpoints  
+- **Amazon Cognito** – Authentication and user management  
+- **Amazon S3** – Secure, scalable photo storage  
+- **Amazon DynamoDB** – NoSQL metadata and report storage  
+- **AWS IAM** – Fine‑grained access control  
+- **AWS SDK for JavaScript** – Uploads, queries, and secure operations  
 
 ---
 
-## Setup & Installation
+## Setup
 
 ### Prerequisites
+- Node.js (v16+)  
+- npm or yarn  
+- AWS account with Cognito, S3, DynamoDB, IAM, and API Gateway configured  
 
-- Node.js (v16+ recommended)
-- npm or yarn
-- AWS account with Cognito, S3, and DynamoDB configured
-
-### Steps
-
-1. Clone the repository:
+### Installation
 
 ```bash
 git clone <repository-url>
-cd room-check-app
+cd roomcheck-upload
+
+npm install
+Configure environment variables (e.g. .env):
+
+COGNITO_USER_POOL_ID
+
+COGNITO_APP_CLIENT_ID
+
+IDENTITY_POOL_ID
+
+S3_BUCKET_NAME
+
+DYNAMODB_TABLE_REPORTS
+
+API_GATEWAY_BASE_URL
+
+Start the development server:
+
+bash
+npm run dev
+```
+---
+
+### Project Timeline
+Nov 2025 – Feb 2026
