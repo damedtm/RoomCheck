@@ -1,19 +1,14 @@
-import { useState, useMemo, useEffect } from "react";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { DynamoDBClient, PutItemCommand } from "@aws-sdk/client-dynamodb";
-import { fromCognitoIdentityPool } from "@aws-sdk/credential-providers";
+import { useState } from "react";
 import { useAuth } from "react-oidc-context";
 
-const REGION = "us-east-2";
-const BUCKET_NAME = "roomcheck-photos-damianohajunwa";
-const TABLE_NAME = "RoomUploads";
-const IDENTITY_POOL_ID = "us-east-2:0d00064d-9170-417c-862e-316009584b52";
+const API_URL =
+  "https://s8h2e5f2j0.execute-api.us-east-2.amazonaws.com/prod/upload";
 
 const DORMS = [
   "Alexander Hall",
   "Campbell South",
-  "Transitional Hall",
   "Campbell North",
+  "Transitional Hall",
   "Dixon Hall",
   "Stewart Hall",
   "One University Place",
@@ -21,174 +16,146 @@ const DORMS = [
   "Courthouse Apartments",
 ];
 
-const MAX_FILE_SIZE_MB = 10;
-
 export default function RAPage() {
   const auth = useAuth();
+
+  const [dorm, setDorm] = useState("");
+  const [room, setRoom] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const [residentName, setResidentName] = useState("");
+  const [residentJNumber, setResidentJNumber] = useState("");
+  const [residentEmail, setResidentEmail] = useState("");
+
+  const [inspectionStatus, setInspectionStatus] = useState("");
+  const [maintenanceIssues, setMaintenanceIssues] = useState([]);
+
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
-  const [warnings, setWarnings] = useState([]);
+
   const [uploading, setUploading] = useState(false);
-  const [dorm, setDorm] = useState("");
-  const [roomNumber, setRoomNumber] = useState("");
-  const [uploadedBy, setUploadedBy] = useState("");
-  const [notes, setNotes] = useState("");
   const [toast, setToast] = useState(null);
 
-  const userId =
-    auth.user?.profile?.sub ??
-    auth.user?.profile?.email ??
-    null;
+  const uploadedByUserId = auth.user?.profile?.sub;
+  const uploadedByName = `${auth.user?.profile?.given_name} ${auth.user?.profile?.family_name}`;
 
-  const userEmail = auth.user?.profile?.email ?? "unknown";
-  const iss = auth.user?.profile?.iss;
-
-  const credentials = useMemo(() => {
-    if (!auth.user || !iss) return null;
-
-    return fromCognitoIdentityPool({
-      clientConfig: { region: REGION },
-      identityPoolId: IDENTITY_POOL_ID,
-      logins: {
-        [`cognito-idp.${REGION}.amazonaws.com/${iss.split("/").pop()}`]:
-          auth.user.id_token,
-      },
+  // Convert file → Base64
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () =>
+        resolve(reader.result.replace(/^data:image\/\w+;base64,/, ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
-  }, [auth.user, iss]);
 
-  const s3 = useMemo(() => {
-    if (!credentials) return null;
-    return new S3Client({
-      region: REGION,
-      credentials,
-      requestChecksumCalculation: "WHEN_REQUIRED",
-    });
-  }, [credentials]);
-
-  const dynamo = useMemo(() => {
-    if (!credentials) return null;
-    return new DynamoDBClient({ region: REGION, credentials });
-  }, [credentials]);
-
-  const authReady = auth.isAuthenticated && auth.user && s3 && dynamo && userId;
-
-  // FILE HANDLING
   const handleFileChange = (e) => {
     const selected = [...e.target.files];
-    if (selected.length === 0) return;
-
-    const newWarnings = [];
-    const validFiles = [];
-
-    selected.forEach((file) => {
-      const sizeMb = file.size / (1024 * 1024);
-      if (sizeMb > MAX_FILE_SIZE_MB) {
-        newWarnings.push(
-          `${file.name} is larger than ${MAX_FILE_SIZE_MB} MB and may upload slowly.`
-        );
-      }
-      validFiles.push(file);
-    });
-
-    setFiles((prev) => [...prev, ...validFiles]);
+    setFiles((prev) => [...prev, ...selected]);
     setPreviews((prev) => [
       ...prev,
-      ...validFiles.map((file) => URL.createObjectURL(file)),
+      ...selected.map((f) => URL.createObjectURL(f)),
     ]);
-    setWarnings((prev) => [...prev, ...newWarnings]);
   };
 
-  const removePreview = (index) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviews((prev) => prev.filter((_, i) => i !== index));
+  const removePreview = (i) => {
+    setFiles((prev) => prev.filter((_, idx) => idx !== i));
+    setPreviews((prev) => prev.filter((_, idx) => idx !== i));
   };
 
-  const clearAllFiles = () => {
-    setFiles([]);
-    setPreviews([]);
-    setWarnings([]);
+  const toggleIssue = (issue) => {
+    setMaintenanceIssues((prev) =>
+      prev.includes(issue)
+        ? prev.filter((i) => i !== issue)
+        : [...prev, issue]
+    );
   };
 
-  useEffect(() => {
-    return () => previews.forEach((url) => URL.revokeObjectURL(url));
-  }, [previews]);
-
-  // UPLOAD LOGIC
   const handleUpload = async () => {
-    if (!authReady || files.length === 0) {
-      setToast({ type: "error", message: "Please select files and fill all required fields." });
+    if (
+      !dorm ||
+      !room ||
+      !inspectionStatus ||
+      !residentName ||
+      !residentJNumber ||
+      !residentEmail
+    ) {
+      setToast({
+        type: "error",
+        message: "Please fill all required fields.",
+      });
       return;
     }
-    if (!dorm || !roomNumber || !uploadedBy) {
-      setToast({ type: "error", message: "Dorm, Room Number, and Uploaded By are required." });
+
+    if (files.length === 0) {
+      setToast({
+        type: "error",
+        message: "Please select at least one image.",
+      });
       return;
     }
 
     setUploading(true);
 
     try {
-      for (const file of files) {
-        const uploadId = crypto.randomUUID();
-        const objectKey = `${userId}/${uploadId}-${file.name}`;
+      const base64Images = await Promise.all(files.map(fileToBase64));
 
-        await s3.send(
-          new PutObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: objectKey,
-            Body: file,
-            ContentType: file.type,
+      await Promise.all(
+        base64Images.map((img) =>
+          fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              dorm,
+              room,
+              notes,
+              imageBase64: img,
+              uploadedByUserId,
+              uploadedByName,
+              residentName,
+              residentJNumber,
+              residentEmail,
+              inspectionStatus,
+              maintenanceIssues,
+            }),
           })
-        );
-
-        await dynamo.send(
-          new PutItemCommand({
-            TableName: TABLE_NAME,
-            Item: {
-              PK: { S: `USER#${userId}` },
-              SK: { S: `UPLOAD#${uploadId}` },
-              userId: { S: userId },
-              userEmail: { S: userEmail },
-              dorm: { S: dorm },
-              roomNumber: { S: roomNumber },
-              uploadedBy: { S: uploadedBy },
-              notes: { S: notes || "None" },
-              fileName: { S: file.name },
-              s3Key: { S: objectKey },
-              createdAt: { S: new Date().toISOString() },
-            },
-          })
-        );
-      }
+        )
+      );
 
       setToast({ type: "success", message: "Upload successful!" });
-      clearAllFiles();
+
       setDorm("");
-      setRoomNumber("");
-      setUploadedBy("");
+      setRoom("");
       setNotes("");
+      setResidentName("");
+      setResidentJNumber("");
+      setResidentEmail("");
+      setInspectionStatus("");
+      setMaintenanceIssues([]);
+      setFiles([]);
+      setPreviews([]);
     } catch (err) {
-      console.error("Upload error:", err);
-      setToast({ type: "error", message: "Upload failed. Check console for details." });
+      console.error(err);
+      setToast({ type: "error", message: "Upload failed." });
     } finally {
       setUploading(false);
     }
   };
 
-  if (!authReady) return <p>Loading...</p>;
+  if (!auth.isAuthenticated) return <p>Loading...</p>;
 
   return (
     <div style={{ background: "#f7f7f7", minHeight: "100vh", padding: "40px" }}>
       <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-
-        {/* Title */}
-        <h1 style={{ textAlign: "center", marginBottom: "10px" }}>
-          RA Dashboard
-        </h1>
-
-        {/* Sub-header */}
-        <h2 style={{ textAlign: "center", color: "#555", marginBottom: "20px" }}>
-          Room‑Check Reporting
+        <h1 style={{ textAlign: "center" }}>RA Dashboard</h1>
+        <h2 style={{ textAlign: "center", color: "#555" }}>
+          RoomCheck Reporting
         </h2>
+
+<h2 style={{ textAlign: "center", marginTop: "10px", color: "#333" }}>
+  Hey {auth.user?.profile?.given_name}
+</h2>
+
 
         {toast && (
           <div
@@ -196,15 +163,18 @@ export default function RAPage() {
               padding: "12px",
               marginBottom: "20px",
               borderRadius: "6px",
-              background: toast.type === "error" ? "#ffe5e5" : "#e5ffe8",
-              border: `1px solid ${toast.type === "error" ? "#ff9a9a" : "#8aff9a"}`,
+              background:
+                toast.type === "error" ? "#ffe5e5" : "#e5ffe8",
+              border:
+                toast.type === "error"
+                  ? "1px solid #ff9a9a"
+                  : "1px solid #8aff9a",
             }}
           >
             {toast.message}
           </div>
         )}
 
-        {/* Upload Form */}
         <div
           style={{
             background: "white",
@@ -213,13 +183,20 @@ export default function RAPage() {
             marginBottom: "20px",
           }}
         >
-          <h2>Upload Room Photos</h2>
-          <p style={{ color: "#666" }}>Logged in as {userEmail}</p>
+          <p style={{ color: "#666" }}>Logged in as {uploadedByName}</p>
+
           <hr style={{ margin: "20px 0" }} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          {/* Dorm + Room */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+            }}
+          >
             <div>
-              <label>Dorm *</label>
+              <label>Dorm </label>
               <select
                 value={dorm}
                 onChange={(e) => setDorm(e.target.value)}
@@ -235,77 +212,200 @@ export default function RAPage() {
             </div>
 
             <div>
-              <label>Room Number *</label>
+              <label>Room Number</label>
               <input
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
+                value={room}
+                onChange={(e) => setRoom(e.target.value)}
                 placeholder="e.g., 214E"
+                style={{ width: "100%" }}
+              />
+            </div>
+          </div>
+
+          {/* Resident Info */}
+          <h3 style={{ marginTop: "20px" }}>Resident Information</h3>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
+            }}
+          >
+            <div>
+              <label>Resident Name </label>
+              <input
+                value={residentName}
+                onChange={(e) => setResidentName(e.target.value)}
                 style={{ width: "100%" }}
               />
             </div>
 
             <div>
-              <label>Uploaded By *</label>
+              <label>J-Number </label>
               <input
-                value={uploadedBy}
-                onChange={(e) => setUploadedBy(e.target.value)}
-                placeholder="Your name"
+                value={residentJNumber}
+                onChange={(e) => setResidentJNumber(e.target.value)}
                 style={{ width: "100%" }}
               />
             </div>
 
             <div style={{ gridColumn: "1 / span 2" }}>
-              <label>Notes (Optional)</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Additional notes"
+              <label>Resident Email </label>
+              <input
+                value={residentEmail}
+                onChange={(e) => setResidentEmail(e.target.value)}
                 style={{ width: "100%" }}
               />
             </div>
           </div>
 
+          {/* Inspection Status */}
+          <h3 style={{ marginTop: "20px" }}>Inspection Status, please select one:</h3>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "16px",
+            }}
+          >
+            {/* PASSED */}
+            <div
+              onClick={() => setInspectionStatus("Passed")}
+              style={{
+                padding: "20px",
+                borderRadius: "8px",
+                background:
+                  inspectionStatus === "Passed" ? "#4caf50" : "#c8e6c9",
+                color: "white",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              <div style={{ fontSize: "18px", marginBottom: "8px" }}>
+                Room Passed Inspection
+              </div>
+              <div style={{ fontSize: "14px", opacity: 0.9 }}>
+                The room was found in good condition. No violations, no
+                cleanliness issues, and no maintenance concerns were observed.
+                No further action is required.
+              </div>
+            </div>
+
+            {/* FAILED */}
+            <div
+              onClick={() => setInspectionStatus("Failed")}
+              style={{
+                padding: "20px",
+                borderRadius: "8px",
+                background:
+                  inspectionStatus === "Failed" ? "#f44336" : "#ffcdd2",
+                color: "white",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              <div style={{ fontSize: "18px", marginBottom: "8px" }}>
+                Room Failed Inspection
+              </div>
+              <div style={{ fontSize: "14px", opacity: 0.9 }}>
+                The room was found in poor condition and did not meet the
+                required cleanliness or safety standards. The resident will
+                automatically receive a notification that they failed their room
+                check.
+              </div>
+            </div>
+
+            {/* MAINTENANCE */}
+            <div
+              onClick={() => setInspectionStatus("Maintenance Concern")}
+              style={{
+                padding: "20px",
+                borderRadius: "8px",
+                background:
+                  inspectionStatus === "Maintenance Concern"
+                    ? "#ff9800"
+                    : "#ffe0b2",
+                color: "white",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              <div style={{ fontSize: "18px", marginBottom: "8px" }}>
+                Room Has Maintenance Concerns
+              </div>
+              <div style={{ fontSize: "14px", opacity: 0.9 }}>
+                The room requires maintenance attention. This may include mold,
+                broken appliances, water damage, HVAC issues, pest concerns, or
+                electrical issues.
+              </div>
+            </div>
+          </div>
+
+          {/* Maintenance Issues */}
+          {inspectionStatus === "Maintenance Concern" && (
+            <div style={{ marginTop: "20px" }}>
+              <h3>Maintenance Issues</h3>
+
+              {[
+                "Mold",
+                "Broken appliances",
+                "Water damage",
+                "HVAC issues",
+                "Electrical issues",
+                "Pest concerns",
+              ].map((issue) => (
+                <div key={issue}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={maintenanceIssues.includes(issue)}
+                      onChange={() => toggleIssue(issue)}
+                    />
+                    {" " + issue}
+                  </label>
+                </div>
+              ))}
+
+              <div style={{ marginTop: "10px" }}>
+                <label>Other</label>
+                <input
+                  type="text"
+                  onBlur={(e) => {
+                    if (e.target.value.trim()) {
+                      toggleIssue(e.target.value.trim());
+                      e.target.value = "";
+                    }
+                  }}
+                  placeholder="Type and press enter"
+                  style={{ width: "100%" }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
           <div style={{ marginTop: "20px" }}>
-            <label>Choose Images</label>
+            <label>Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              style={{ width: "100%" }}
+            />
+          </div>
+
+          {/* File Upload */}
+          <div style={{ marginTop: "20px" }}>
+            <label>Choose Images </label>
             <input type="file" multiple accept="image/*" onChange={handleFileChange} />
           </div>
 
-          {warnings.length > 0 && (
+          {/* Previews */}
+          {previews.length > 0 && (
             <div
               style={{
-                marginTop: "16px",
-                padding: "10px",
-                background: "#fff8e1",
-                borderRadius: "6px",
-              }}
-            >
-              {warnings.map((w, i) => (
-                <p key={i} style={{ margin: 0 }}>
-                  {w}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Preview Section */}
-        {previews.length > 0 && (
-          <div
-            style={{
-              background: "white",
-              padding: "20px",
-              borderRadius: "8px",
-              marginBottom: "20px",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <h2>Selected Images ({previews.length})</h2>
-              <button onClick={clearAllFiles}>Clear All</button>
-            </div>
-            <hr style={{ margin: "20px 0" }} />
-
-            <div
-              style={{
+                marginTop: "20px",
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
                 gap: "12px",
@@ -323,8 +423,12 @@ export default function RAPage() {
                 >
                   <img
                     src={src}
-                    alt={`preview-${i}`}
-                    style={{ width: "100%", height: "120px", objectFit: "cover" }}
+                    alt="preview"
+                    style={{
+                      width: "100%",
+                      height: "120px",
+                      objectFit: "cover",
+                    }}
                   />
                   <button
                     onClick={() => removePreview(i)}
@@ -343,13 +447,13 @@ export default function RAPage() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Upload Button */}
         <button
           onClick={handleUpload}
-          disabled={uploading || files.length === 0}
+          disabled={uploading}
           style={{
             width: "100%",
             padding: "14px",
