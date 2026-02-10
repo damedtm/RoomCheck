@@ -6,7 +6,7 @@ import { useAuth } from "react-oidc-context";
 import AddUserForm from "./AddUserForm";
 import ManageUsersTable from "./ManageUsersTable";
 import ViewUploads from "./ViewUploads";
-import { getUploads, createUser } from "./api";
+import { getUploads, createUser, deleteUpload } from "./api";
 
 const DORMS = [
   "Alexander Hall",
@@ -39,6 +39,9 @@ export default function AdminPage() {
   // USERS STATE
   const [creatingUser, setCreatingUser] = useState(false);
   const [createError, setCreateError] = useState(null);
+
+  // DELETE STATE
+  const [deleting, setDeleting] = useState(false);
 
   // FETCH UPLOADS
   useEffect(() => {
@@ -73,8 +76,46 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteUpload = async (upload) => {
+    if (!window.confirm(`Are you sure you want to delete the upload for ${upload.dorm} Room ${upload.room}?`)) {
+      return;
+    }
+
+    setDeleting(true);
+    
+    try {
+      // Extract the data we need
+      const userId = upload.uploadedByUserId;
+      const timestamp = upload.uploadedAt;
+      const imageKey = upload.imageKey;
+
+      console.log("Deleting upload:", { userId, timestamp, imageKey });
+
+      // Call the API
+      await deleteUpload(userId, timestamp, imageKey, auth.user.id_token);
+      
+      // Remove from local state
+      setUploads((prev) => prev.filter((u) => u.uploadedAt !== timestamp));
+      
+      alert("Upload deleted successfully!");
+      
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Failed to delete upload: " + err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // FILTER UPLOADS BY DORM
+  const filteredUploads =
+    selectedDorm === "All"
+      ? uploads
+      : uploads.filter((u) => u.dorm === selectedDorm);
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#f7f7f7" }}>
+    <div style={{ display: "flex", height: "100vh", background: "#f3f4f6" }}>
+      
       {/* SIDEBAR */}
       <div
         style={{
@@ -82,14 +123,14 @@ export default function AdminPage() {
           background: "white",
           borderRight: "1px solid #ddd",
           padding: "20px",
+          overflowY: "auto",
           position: "fixed",
           top: 0,
-          left: 0,
           bottom: 0,
-          overflowY: "auto"
+          left: 0
         }}
       >
-        <h2 style={{ marginBottom: "20px" }}>Admin Menu</h2>
+        <h2 style={{ marginBottom: "20px", fontWeight: 700 }}>Admin Menu</h2>
 
         {/* DORM REPORTS */}
         <div
@@ -230,7 +271,14 @@ export default function AdminPage() {
       </div>
 
       {/* MAIN CONTENT */}
-      <div style={{ marginLeft: "300px", padding: "40px", width: "100%" }}>
+      <div
+        style={{
+          marginLeft: "300px",
+          padding: "40px",
+          width: "100%",
+          overflowY: "auto"
+        }}
+      >
         <h1 style={{ textAlign: "center", marginBottom: "10px" }}>
           Admin Dashboard
         </h1>
@@ -261,7 +309,7 @@ export default function AdminPage() {
           <p>Loading reports...</p>
         ) : selectedSection === "reports" ? (
           <ViewUploads
-            uploads={uploads}
+            uploads={filteredUploads}
             search={search}
             setSearch={setSearch}
             selectedDorm={selectedDorm}
@@ -270,6 +318,8 @@ export default function AdminPage() {
             setPage={setPage}
             PER_PAGE={PER_PAGE}
             DORMS={DORMS}
+            onDelete={handleDeleteUpload}
+            deleting={deleting}
           />
         ) : userAction === "add" ? (
           <AddUserForm

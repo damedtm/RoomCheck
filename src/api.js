@@ -2,45 +2,50 @@
 
 const API_BASE = "https://lsnro81xgl.execute-api.us-east-2.amazonaws.com/prod";
 
-// Helper to parse API Gateway proxy responses
-function parseApiResponse(data) {
-  try {
-    return JSON.parse(data.body);
-  } catch {
-    return {};
-  }
-}
-
-// ----------------------
-// GET UPLOADS
-// ----------------------
-export async function getUploads(token) {
-  const resp = await fetch(`${API_BASE}/admin/get-uploads`, {
+export async function getUploads(idToken) {
+  const res = await fetch(`${API_BASE}/admin/get-uploads`, {
+    method: "GET",
     headers: {
-      Authorization: `Bearer ${token}`
+      Authorization: `Bearer ${idToken}`
     }
   });
 
-  const data = await resp.json();
-  const parsed = parseApiResponse(data);
-
-  return parsed.items || [];
+  if (!res.ok) throw new Error("Failed to fetch uploads");
+  const data = await res.json();
+  return data.items || [];
 }
 
-// ----------------------
-// CREATE USER
-// ----------------------
 export async function createUser(formData) {
-  const resp = await fetch(`${API_BASE}/admin/create-user`, {
+  const res = await fetch(`${API_BASE}/create-user`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(formData)
   });
-
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.message || "Failed to create user");
+  if (!res.ok) {
+    const errData = await res.json();
+    throw new Error(errData.message || "Failed to create user");
   }
+  return res.json();
+}
 
-  return true;
+export async function deleteUpload(userId, timestamp, imageKey, idToken) {
+  const res = await fetch(`${API_BASE}/admin/delete-upload`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ 
+      userId, 
+      timestamp, 
+      imageKey 
+    })
+  });
+
+  if (!res.ok) {
+    const errData = await res.json();
+    throw new Error(errData.message || "Failed to delete upload");
+  }
+  
+  return res.json();
 }

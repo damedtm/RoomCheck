@@ -1,84 +1,146 @@
-// ViewUploads.jsx
+import React, { useState } from "react";
 
 export default function ViewUploads({
   uploads,
   search,
   setSearch,
-  selectedDorm,
-  setSelectedDorm,
   page,
   setPage,
   PER_PAGE,
-  DORMS
+  onDelete,
+  deleting
 }) {
-  const searchLower = search.toLowerCase();
+  const [sortStatus, setSortStatus] = useState("none");
+  const [sortDate, setSortDate] = useState("newest");
+  const [modalImage, setModalImage] = useState(null);
 
+  // -----------------------------
+  // DELETE HANDLER WITH DEBUG LOGS
+  // -----------------------------
+  const handleDeleteUpload = async (upload) => {
+    console.log("Upload object:", upload); // DEBUG
+
+    if (
+      !window.confirm(
+        `Are you sure you want to delete the upload for ${upload.dorm} Room ${upload.room}?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const userId = upload.uploadedByUserId;
+      const timestamp = upload.uploadedAt;
+      const imageKey = upload.imageKey;
+
+      console.log("Extracted values:", { userId, timestamp, imageKey }); // DEBUG
+
+      await onDelete(upload);
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Failed to delete upload: " + err.message);
+    }
+  };
+
+  // -----------------------------
+  // FILTERING
+  // -----------------------------
   const filtered = uploads.filter((u) => {
-    const fields = [
-      u.uploadedByName,
-      u.dorm,
-      u.room,
-      u.residentName,
-      u.residentEmail,
-      u.notes
-    ];
-    return fields.some((f) => f?.toLowerCase().includes(searchLower));
+    const term = search.toLowerCase();
+    return (
+      u.room?.toLowerCase().includes(term) ||
+      u.residentName?.toLowerCase().includes(term) ||
+      u.residentEmail?.toLowerCase().includes(term) ||
+      u.notes?.toLowerCase().includes(term)
+    );
   });
 
-  const dormFiltered =
-    selectedDorm === "All"
-      ? filtered
-      : filtered.filter((u) => u.dorm === selectedDorm);
+  // -----------------------------
+  // SORTING
+  // -----------------------------
+  let sorted = [...filtered];
 
-  const paginated = dormFiltered.slice(
-    (page - 1) * PER_PAGE,
-    page * PER_PAGE
-  );
+  if (sortStatus !== "none") {
+    sorted.sort((a, b) => {
+      const aMatch = a.inspectionStatus === sortStatus ? 1 : 0;
+      const bMatch = b.inspectionStatus === sortStatus ? 1 : 0;
+      return bMatch - aMatch;
+    });
+  }
 
+  sorted.sort((a, b) => {
+    const dateA = new Date(a.uploadedAt);
+    const dateB = new Date(b.uploadedAt);
+    return sortDate === "newest" ? dateB - dateA : dateA - dateB;
+  });
+
+  // -----------------------------
+  // PAGINATION
+  // -----------------------------
+  const start = (page - 1) * PER_PAGE;
+  const paginated = sorted.slice(start, start + PER_PAGE);
+  const totalPages = Math.ceil(sorted.length / PER_PAGE);
+
+  // -----------------------------
+  // RENDER
+  // -----------------------------
   return (
-    <div style={{ background: "white", padding: 20, borderRadius: 8 }}>
-      <h2>Dorm Reports</h2>
-
-      {/* Search + Dorm Filter */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+    <div style={{ width: "100%", overflowX: "auto" }}>
+      {/* SEARCH + SORT */}
+      <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
         <input
-          placeholder="Search by RA, dorm, room, resident, notes..."
+          type="text"
+          placeholder="Search reports..."
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            padding: "10px",
+            width: "300px",
+            borderRadius: "6px",
+            border: "1px solid #ccc"
           }}
-          style={{ flex: 1, padding: 10 }}
         />
 
         <select
-          value={selectedDorm}
-          onChange={(e) => {
-            setSelectedDorm(e.target.value);
-            setPage(1);
+          value={sortStatus}
+          onChange={(e) => setSortStatus(e.target.value)}
+          style={{
+            padding: "10px",
+            borderRadius: "6px",
+            border: "1px solid #ccc"
           }}
-          style={{ padding: 10 }}
         >
-          <option value="All">All Dorms</option>
-          {DORMS.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
+          <option value="none">Sort by Status</option>
+          <option value="Passed">Passed First</option>
+          <option value="Failed">Failed First</option>
+          <option value="Maintenance Concern">Maintenance First</option>
+        </select>
+
+        <select
+          value={sortDate}
+          onChange={(e) => setSortDate(e.target.value)}
+          style={{
+            padding: "10px",
+            borderRadius: "6px",
+            border: "1px solid #ccc"
+          }}
+        >
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
         </select>
       </div>
 
-      {/* Table */}
+      {/* TABLE */}
       <table
         style={{
           width: "100%",
           borderCollapse: "separate",
-          borderSpacing: "0 8px"
+          borderSpacing: "0 10px"
         }}
       >
         <thead>
-          <tr>
-            <th>Image</th>
+          <tr style={{ textAlign: "left", fontWeight: 600 }}>
+            <th>Actions</th>
             <th>RA</th>
             <th>Dorm</th>
             <th>Room</th>
@@ -92,67 +154,211 @@ export default function ViewUploads({
 
         <tbody>
           {paginated.map((u, index) => (
-            <tr key={index} style={{ background: "#fafafa" }}>
-              <td style={{ padding: 10 }}>
-                {u.imageUrl && (
-                  <img
-                    src={u.imageUrl}
-                    alt="preview"
+            <tr
+              key={index}
+              style={{
+                background: "white",
+                borderRadius: "8px",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
+              }}
+            >
+              {/* ACTIONS */}
+              <td style={{ padding: "12px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                    width: "120px"
+                  }}
+                >
+                  <button
+                    onClick={() => setModalImage(u.imageUrl)}
                     style={{
-                      width: 80,
-                      height: 80,
-                      objectFit: "cover",
-                      borderRadius: 6
+                      padding: "6px 10px",
+                      background: "#2563eb",
+                      color: "white",
+                      borderRadius: "4px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 500
                     }}
-                  />
-                )}
+                  >
+                    View Image
+                  </button>
+
+                  <button
+                    onClick={() => window.open(u.downloadUrl)}
+                    style={{
+                      padding: "6px 10px",
+                      background: "#16a34a",
+                      color: "white",
+                      borderRadius: "4px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 500
+                    }}
+                  >
+                    Download
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteUpload(u)}
+                    disabled={deleting}
+                    style={{
+                      padding: "6px 10px",
+                      background: deleting ? "#9ca3af" : "#dc2626",
+                      color: "white",
+                      borderRadius: "4px",
+                      border: "none",
+                      cursor: deleting ? "not-allowed" : "pointer",
+                      fontSize: "12px",
+                      fontWeight: 500
+                    }}
+                  >
+                    {deleting ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
               </td>
 
-              <td>{u.uploadedByName}</td>
-              <td>{u.dorm}</td>
-              <td>{u.room}</td>
-
-              <td>
-                {u.residentName}
-                <br />
-                <small>{u.residentEmail}</small>
-                <br />
-                <small>{u.residentJNumber}</small>
+              {/* RA NAME (with fallback) */}
+              <td style={{ padding: "12px" }}>
+                {u.uploadedByName || "Unknown"}
               </td>
 
-              <td>{u.inspectionStatus}</td>
+              <td style={{ padding: "12px" }}>{u.dorm}</td>
+              <td style={{ padding: "12px" }}>{u.room}</td>
 
-              <td>
+              {/* RESIDENT */}
+              <td style={{ padding: "12px" }}>
+                <div style={{ fontWeight: 600 }}>{u.residentName}</div>
+                <div style={{ fontSize: "12px", color: "#555" }}>
+                  {u.residentEmail}
+                </div>
+                <div style={{ fontSize: "12px", color: "#777" }}>
+                  {u.residentJNumber}
+                </div>
+              </td>
+
+              {/* STATUS */}
+              <td style={{ padding: "12px" }}>
+                <span
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "4px",
+                    background:
+                      u.inspectionStatus === "Passed"
+                        ? "#16a34a22"
+                        : u.inspectionStatus === "Failed"
+                        ? "#dc262622"
+                        : "#f59e0b22",
+                    color:
+                      u.inspectionStatus === "Passed"
+                        ? "#166534"
+                        : u.inspectionStatus === "Failed"
+                        ? "#991b1b"
+                        : "#92400e",
+                    fontWeight: 600,
+                    fontSize: "12px"
+                  }}
+                >
+                  {u.inspectionStatus}
+                </span>
+              </td>
+
+              {/* ISSUES */}
+              <td style={{ padding: "12px" }}>
                 {u.maintenanceIssues.length === 0
                   ? "None"
                   : u.maintenanceIssues.join(", ")}
               </td>
 
-              <td>{u.notes}</td>
+              {/* NOTES */}
+              <td style={{ padding: "12px" }}>{u.notes}</td>
 
-              <td>{new Date(u.uploadedAt).toLocaleString()}</td>
+              {/* DATE */}
+              <td style={{ padding: "12px" }}>
+                {new Date(u.uploadedAt).toLocaleString()}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      {/* Pagination */}
-      <div style={{ marginTop: 20 }}>
+      {/* PAGINATION */}
+      <div
+        style={{
+          marginTop: "20px",
+          display: "flex",
+          justifyContent: "center",
+          gap: "10px"
+        }}
+      >
         <button
           disabled={page === 1}
           onClick={() => setPage(page - 1)}
-          style={{ marginRight: 10 }}
+          style={{
+            padding: "8px 12px",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+            background: page === 1 ? "#eee" : "white",
+            cursor: page === 1 ? "not-allowed" : "pointer"
+          }}
         >
-          Previous
+          Prev
         </button>
 
+        <span style={{ padding: "8px 12px" }}>
+          Page {page} of {totalPages}
+        </span>
+
         <button
-          disabled={page * PER_PAGE >= dormFiltered.length}
+          disabled={page === totalPages}
           onClick={() => setPage(page + 1)}
+          style={{
+            padding: "8px 12px",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+            background: page === totalPages ? "#eee" : "white",
+            cursor: page === totalPages ? "not-allowed" : "pointer"
+          }}
         >
           Next
         </button>
       </div>
+
+      {/* IMAGE MODAL */}
+      {modalImage && (
+        <div
+          onClick={() => setModalImage(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            cursor: "pointer",
+            zIndex: 9999
+          }}
+        >
+          <img
+            src={modalImage}
+            alt="Full View"
+            style={{
+              maxWidth: "90%",
+              maxHeight: "90%",
+              borderRadius: "8px",
+              boxShadow: "0 0 20px rgba(0,0,0,0.5)"
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useAuth } from "react-oidc-context";
 
 const API_URL = "https://ndd3vawb71.execute-api.us-east-2.amazonaws.com/prod/upload";
-
 const DORMS = [
   "Alexander Hall",
   "Campbell South",
@@ -17,26 +16,24 @@ const DORMS = [
 
 export default function RAPage() {
   const auth = useAuth();
-
   const [dorm, setDorm] = useState("");
   const [room, setRoom] = useState("");
   const [notes, setNotes] = useState("");
-
   const [residentName, setResidentName] = useState("");
   const [residentJNumber, setResidentJNumber] = useState("");
   const [residentEmail, setResidentEmail] = useState("");
-
   const [inspectionStatus, setInspectionStatus] = useState("");
   const [maintenanceIssues, setMaintenanceIssues] = useState([]);
-
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
-
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState(null);
+  
+  // Manual RA name entry
+  const [uploadedByName, setUploadedByName] = useState("");
+  const [isEditingRAName, setIsEditingRAName] = useState(false);
 
   const uploadedByUserId = auth.user?.profile?.sub;
-  const uploadedByName = `${auth.user?.profile?.given_name} ${auth.user?.profile?.family_name}`;
 
   // Convert file → Base64
   const fileToBase64 = (file) =>
@@ -77,15 +74,15 @@ export default function RAPage() {
       !inspectionStatus ||
       !residentName ||
       !residentJNumber ||
-      !residentEmail
+      !residentEmail ||
+      !uploadedByName
     ) {
       setToast({
         type: "error",
-        message: "Please fill all required fields.",
+        message: "Please fill all required fields including your name.",
       });
       return;
     }
-
     if (files.length === 0) {
       setToast({
         type: "error",
@@ -93,12 +90,9 @@ export default function RAPage() {
       });
       return;
     }
-
     setUploading(true);
-
     try {
       const base64Images = await Promise.all(files.map(fileToBase64));
-
       await Promise.all(
         base64Images.map((img) =>
           fetch(API_URL, {
@@ -120,9 +114,7 @@ export default function RAPage() {
           })
         )
       );
-
       setToast({ type: "success", message: "Upload successful!" });
-
       setDorm("");
       setRoom("");
       setNotes("");
@@ -133,6 +125,7 @@ export default function RAPage() {
       setMaintenanceIssues([]);
       setFiles([]);
       setPreviews([]);
+      // Keep uploadedByName so they don't have to re-enter it
     } catch (err) {
       console.error(err);
       setToast({ type: "error", message: "Upload failed." });
@@ -150,11 +143,6 @@ export default function RAPage() {
         <h2 style={{ textAlign: "center", color: "#555" }}>
           RoomCheck Reporting
         </h2>
-
-<h2 style={{ textAlign: "center", marginTop: "10px", color: "#333" }}>
-  Hey {auth.user?.profile?.given_name}
-</h2>
-
         {toast && (
           <div
             style={{
@@ -172,7 +160,6 @@ export default function RAPage() {
             {toast.message}
           </div>
         )}
-
         <div
           style={{
             background: "white",
@@ -181,10 +168,67 @@ export default function RAPage() {
             marginBottom: "20px",
           }}
         >
-          <p style={{ color: "#666" }}>Logged in as {uploadedByName}</p>
-
+          <p style={{ color: "#666" }}>Logged in as {auth.user.profile.email}</p>
+          
+          {/* Manual RA Name Entry */}
+          <div style={{ marginTop: "12px", marginBottom: "12px" }}>
+            <label style={{ display: "block", marginBottom: "6px", fontWeight: "500" }}>
+              Uploaded By <span style={{ color: "red" }}>*</span>
+            </label>
+            {!isEditingRAName && uploadedByName ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ color: "#333", fontSize: "15px" }}>
+                  {uploadedByName}
+                </span>
+                <button
+                  onClick={() => setIsEditingRAName(true)}
+                  style={{
+                    padding: "6px 12px",
+                    background: "#e3f2fd",
+                    color: "#1976d2",
+                    border: "1px solid #1976d2",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                  }}
+                >
+                  Edit Name
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input
+                  type="text"
+                  value={uploadedByName}
+                  onChange={(e) => setUploadedByName(e.target.value)}
+                  placeholder="Enter your full name"
+                  style={{ 
+                    flex: 1, 
+                    padding: "8px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px"
+                  }}
+                />
+                {uploadedByName && (
+                  <button
+                    onClick={() => setIsEditingRAName(false)}
+                    style={{
+                      padding: "8px 16px",
+                      background: "#4caf50",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Save
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+          
           <hr style={{ margin: "20px 0" }} />
-
           {/* Dorm + Room */}
           <div
             style={{
@@ -208,7 +252,6 @@ export default function RAPage() {
                 ))}
               </select>
             </div>
-
             <div>
               <label>Room Number</label>
               <input
@@ -219,10 +262,8 @@ export default function RAPage() {
               />
             </div>
           </div>
-
           {/* Resident Info */}
           <h3 style={{ marginTop: "20px" }}>Resident Information</h3>
-
           <div
             style={{
               display: "grid",
@@ -238,7 +279,6 @@ export default function RAPage() {
                 style={{ width: "100%" }}
               />
             </div>
-
             <div>
               <label>J-Number </label>
               <input
@@ -247,7 +287,6 @@ export default function RAPage() {
                 style={{ width: "100%" }}
               />
             </div>
-
             <div style={{ gridColumn: "1 / span 2" }}>
               <label>Resident Email </label>
               <input
@@ -257,10 +296,8 @@ export default function RAPage() {
               />
             </div>
           </div>
-
           {/* Inspection Status */}
           <h3 style={{ marginTop: "20px" }}>Inspection Status, please select one:</h3>
-
           <div
             style={{
               display: "grid",
@@ -290,7 +327,6 @@ export default function RAPage() {
                 No further action is required.
               </div>
             </div>
-
             {/* FAILED */}
             <div
               onClick={() => setInspectionStatus("Failed")}
@@ -314,7 +350,6 @@ export default function RAPage() {
                 check.
               </div>
             </div>
-
             {/* MAINTENANCE */}
             <div
               onClick={() => setInspectionStatus("Maintenance Concern")}
@@ -340,12 +375,10 @@ export default function RAPage() {
               </div>
             </div>
           </div>
-
           {/* Maintenance Issues */}
           {inspectionStatus === "Maintenance Concern" && (
             <div style={{ marginTop: "20px" }}>
               <h3>Maintenance Issues</h3>
-
               {[
                 "Mold",
                 "Broken appliances",
@@ -365,7 +398,6 @@ export default function RAPage() {
                   </label>
                 </div>
               ))}
-
               <div style={{ marginTop: "10px" }}>
                 <label>Other</label>
                 <input
@@ -382,7 +414,6 @@ export default function RAPage() {
               </div>
             </div>
           )}
-
           {/* Notes */}
           <div style={{ marginTop: "20px" }}>
             <label>Notes (Optional)</label>
@@ -392,13 +423,11 @@ export default function RAPage() {
               style={{ width: "100%" }}
             />
           </div>
-
           {/* File Upload */}
           <div style={{ marginTop: "20px" }}>
             <label>Choose Images </label>
             <input type="file" multiple accept="image/*" onChange={handleFileChange} />
           </div>
-
           {/* Previews */}
           {previews.length > 0 && (
             <div
@@ -447,7 +476,6 @@ export default function RAPage() {
             </div>
           )}
         </div>
-
         {/* Upload Button */}
         <button
           onClick={handleUpload}
@@ -465,7 +493,6 @@ export default function RAPage() {
         >
           {uploading ? "Uploading..." : "Upload"}
         </button>
-
         {/* Sign Out */}
         <button
           onClick={() => auth.removeUser()}
@@ -485,5 +512,3 @@ export default function RAPage() {
     </div>
   );
 }
-
-
