@@ -18,17 +18,14 @@ const DORMS = [
 function getErrorMessage(error, response) {
   if (!error) return "Upload failed. Please try again.";
   
-  // Network errors
   if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
     return "Network error. Please check your internet connection and try again.";
   }
   
-  // Timeout errors
   if (error.message?.includes('timeout')) {
     return "Request timed out. The server took too long to respond. Please try again.";
   }
 
-  // HTTP status errors
   if (error.message?.includes('status: 400')) {
     return "Invalid data sent to server. Please check all fields and try again.";
   }
@@ -49,7 +46,6 @@ function getErrorMessage(error, response) {
     return "Service temporarily unavailable. Please try again in a few minutes.";
   }
   
-  // Generic error with message
   if (error.message) {
     return error.message;
   }
@@ -75,13 +71,11 @@ export default function RAPage() {
   const [errors, setErrors] = useState({});
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   
-  // Manual RA name entry
   const [uploadedByName, setUploadedByName] = useState("");
   const [isEditingRAName, setIsEditingRAName] = useState(false);
 
   const uploadedByUserId = auth.user?.profile?.sub;
 
-  // Validation function
   const validateForm = () => {
     const newErrors = {};
 
@@ -133,7 +127,6 @@ export default function RAPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Convert file → Base64
   const fileToBase64 = (file) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -146,7 +139,6 @@ export default function RAPage() {
   const handleFileChange = (e) => {
     const selected = [...e.target.files];
     
-    // Validate file types
     const validFiles = selected.filter(file => {
       if (!file.type.startsWith('image/')) {
         setToast({
@@ -155,7 +147,6 @@ export default function RAPage() {
         });
         return false;
       }
-      // Check file size (10MB limit)
       if (file.size > 10 * 1024 * 1024) {
         setToast({
           type: "error",
@@ -172,7 +163,6 @@ export default function RAPage() {
         ...prev,
         ...validFiles.map((f) => URL.createObjectURL(f)),
       ]);
-      // Clear file error if files are added
       if (errors.files) {
         setErrors(prev => ({ ...prev, files: undefined }));
       }
@@ -208,7 +198,7 @@ export default function RAPage() {
 
   const uploadSingleImage = async (imageBase64, imageIndex, totalImages) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
       const response = await fetch(API_URL, {
@@ -233,7 +223,6 @@ export default function RAPage() {
 
       clearTimeout(timeoutId);
 
-      // Try to get error details from response body
       let errorData = null;
       try {
         errorData = await response.json();
@@ -259,7 +248,6 @@ export default function RAPage() {
   };
 
   const handleUpload = async () => {
-    // Validate form
     if (!validateForm()) {
       setToast({
         type: "error",
@@ -276,7 +264,6 @@ export default function RAPage() {
     try {
       const base64Images = await Promise.all(files.map(fileToBase64));
       
-      // Upload images one at a time with progress tracking
       const results = [];
       for (let i = 0; i < base64Images.length; i++) {
         setUploadProgress({ current: i + 1, total: base64Images.length });
@@ -285,7 +272,6 @@ export default function RAPage() {
           const result = await uploadSingleImage(base64Images[i], i, base64Images.length);
           results.push(result);
         } catch (error) {
-          // If one image fails, show which one and stop
           throw new Error(`Failed to upload image ${i + 1} of ${base64Images.length}: ${error.message}`);
         }
       }
@@ -295,7 +281,6 @@ export default function RAPage() {
         message: `Upload successful! ${files.length} image${files.length > 1 ? 's' : ''} uploaded.` 
       });
       
-      // Reset form
       setDorm("");
       setRoom("");
       setNotes("");
@@ -345,10 +330,26 @@ export default function RAPage() {
   if (!auth.isAuthenticated) return <p>Loading...</p>;
 
   return (
-    <div style={{ background: "#f7f7f7", minHeight: "100vh", padding: "40px" }}>
+    <div style={{ 
+      background: "#f7f7f7", 
+      minHeight: "100vh", 
+      padding: "16px",
+    }}>
       <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-        <h1 style={{ textAlign: "center" }}>RA Dashboard</h1>
-        <h2 style={{ textAlign: "center", color: "#555" }}>
+        <h1 style={{ 
+          textAlign: "center",
+          fontSize: "clamp(24px, 5vw, 32px)",
+          margin: "0 0 8px 0"
+        }}>
+          RA Dashboard
+        </h1>
+        <h2 style={{ 
+          textAlign: "center", 
+          color: "#555",
+          fontSize: "clamp(16px, 4vw, 20px)",
+          margin: "0 0 16px 0",
+          fontWeight: "400"
+        }}>
           RoomCheck Reporting
         </h2>
         
@@ -356,14 +357,14 @@ export default function RAPage() {
           <div
             style={{
               padding: "12px",
-              marginBottom: "20px",
+              marginBottom: "16px",
               borderRadius: "6px",
               background: toast.type === "error" ? "#ffe5e5" : "#e5ffe8",
               border: toast.type === "error" ? "1px solid #ff9a9a" : "1px solid #8aff9a",
               color: toast.type === "error" ? "#c00" : "#0a0",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
               <span style={{ fontSize: "18px" }}>
                 {toast.type === "error" ? "❌" : "✅"}
               </span>
@@ -375,20 +376,32 @@ export default function RAPage() {
         <div
           style={{
             background: "white",
-            padding: "20px",
+            padding: "16px",
             borderRadius: "8px",
-            marginBottom: "20px",
+            marginBottom: "16px",
           }}
         >
-          <p style={{ color: "#666" }}>Logged in as {auth.user.profile.email}</p>
+          <p style={{ 
+            color: "#666", 
+            margin: "0 0 12px 0",
+            fontSize: "14px",
+            wordBreak: "break-word"
+          }}>
+            Logged in as {auth.user.profile.email}
+          </p>
           
           {/* Manual RA Name Entry */}
-          <div style={{ marginTop: "12px", marginBottom: "12px" }}>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: "500" }}>
+          <div style={{ marginBottom: "16px" }}>
+            <label style={{ 
+              display: "block", 
+              marginBottom: "6px", 
+              fontWeight: "500",
+              fontSize: "14px"
+            }}>
               Uploaded By <span style={{ color: "red" }}>*</span>
             </label>
             {!isEditingRAName && uploadedByName ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                 <span style={{ color: "#333", fontSize: "15px" }}>
                   {uploadedByName}
                 </span>
@@ -408,7 +421,7 @@ export default function RAPage() {
                 </button>
               </div>
             ) : (
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "stretch", flexDirection: "column" }}>
                 <input
                   type="text"
                   value={uploadedByName}
@@ -420,22 +433,26 @@ export default function RAPage() {
                   }}
                   placeholder="Enter your full name"
                   style={{ 
-                    flex: 1, 
-                    padding: "8px",
+                    padding: "10px",
                     border: errors.uploadedByName ? "2px solid #f44336" : "1px solid #ddd",
-                    borderRadius: "4px"
+                    borderRadius: "4px",
+                    fontSize: "16px",
+                    width: "100%",
+                    boxSizing: "border-box"
                   }}
                 />
                 {uploadedByName && (
                   <button
                     onClick={() => setIsEditingRAName(false)}
                     style={{
-                      padding: "8px 16px",
+                      padding: "10px 16px",
                       background: "#4caf50",
                       color: "white",
                       border: "none",
                       borderRadius: "4px",
                       cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: "500"
                     }}
                   >
                     Save
@@ -444,24 +461,29 @@ export default function RAPage() {
               </div>
             )}
             {errors.uploadedByName && (
-              <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px" }}>
+              <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px", margin: "4px 0 0 0" }}>
                 {errors.uploadedByName}
               </p>
             )}
           </div>
           
-          <hr style={{ margin: "20px 0" }} />
+          <hr style={{ margin: "16px 0", border: "none", borderTop: "1px solid #e0e0e0" }} />
           
-          {/* Dorm + Room */}
+          {/* Dorm + Room - Stacked on mobile */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "1fr",
               gap: "16px",
             }}
           >
             <div>
-              <label style={{ fontWeight: "500" }}>
+              <label style={{ 
+                fontWeight: "500",
+                fontSize: "14px",
+                display: "block",
+                marginBottom: "6px"
+              }}>
                 Dorm <span style={{ color: "red" }}>*</span>
               </label>
               <select
@@ -474,9 +496,11 @@ export default function RAPage() {
                 }}
                 style={{ 
                   width: "100%",
-                  padding: "8px",
+                  padding: "10px",
                   border: errors.dorm ? "2px solid #f44336" : "1px solid #ddd",
-                  borderRadius: "4px"
+                  borderRadius: "4px",
+                  fontSize: "16px",
+                  boxSizing: "border-box"
                 }}
               >
                 <option value="">Select Dorm</option>
@@ -487,13 +511,18 @@ export default function RAPage() {
                 ))}
               </select>
               {errors.dorm && (
-                <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px" }}>
+                <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>
                   {errors.dorm}
                 </p>
               )}
             </div>
             <div>
-              <label style={{ fontWeight: "500" }}>
+              <label style={{ 
+                fontWeight: "500",
+                fontSize: "14px",
+                display: "block",
+                marginBottom: "6px"
+              }}>
                 Room Number <span style={{ color: "red" }}>*</span>
               </label>
               <input
@@ -507,13 +536,15 @@ export default function RAPage() {
                 placeholder="e.g., 214E"
                 style={{ 
                   width: "100%",
-                  padding: "8px",
+                  padding: "10px",
                   border: errors.room ? "2px solid #f44336" : "1px solid #ddd",
-                  borderRadius: "4px"
+                  borderRadius: "4px",
+                  fontSize: "16px",
+                  boxSizing: "border-box"
                 }}
               />
               {errors.room && (
-                <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px" }}>
+                <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>
                   {errors.room}
                 </p>
               )}
@@ -521,16 +552,21 @@ export default function RAPage() {
           </div>
           
           {/* Resident Info */}
-          <h3 style={{ marginTop: "20px" }}>Resident Information</h3>
+          <h3 style={{ margin: "20px 0 12px 0", fontSize: "18px" }}>Resident Information</h3>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "1fr",
               gap: "16px",
             }}
           >
             <div>
-              <label style={{ fontWeight: "500" }}>
+              <label style={{ 
+                fontWeight: "500",
+                fontSize: "14px",
+                display: "block",
+                marginBottom: "6px"
+              }}>
                 Resident Name <span style={{ color: "red" }}>*</span>
               </label>
               <input
@@ -544,19 +580,26 @@ export default function RAPage() {
                 placeholder="Full name"
                 style={{ 
                   width: "100%",
-                  padding: "8px",
+                  padding: "10px",
                   border: errors.residentName ? "2px solid #f44336" : "1px solid #ddd",
-                  borderRadius: "4px"
+                  borderRadius: "4px",
+                  fontSize: "16px",
+                  boxSizing: "border-box"
                 }}
               />
               {errors.residentName && (
-                <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px" }}>
+                <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>
                   {errors.residentName}
                 </p>
               )}
             </div>
             <div>
-              <label style={{ fontWeight: "500" }}>
+              <label style={{ 
+                fontWeight: "500",
+                fontSize: "14px",
+                display: "block",
+                marginBottom: "6px"
+              }}>
                 J-Number <span style={{ color: "red" }}>*</span>
               </label>
               <input
@@ -570,19 +613,26 @@ export default function RAPage() {
                 placeholder="e.g., J12345"
                 style={{ 
                   width: "100%",
-                  padding: "8px",
+                  padding: "10px",
                   border: errors.residentJNumber ? "2px solid #f44336" : "1px solid #ddd",
-                  borderRadius: "4px"
+                  borderRadius: "4px",
+                  fontSize: "16px",
+                  boxSizing: "border-box"
                 }}
               />
               {errors.residentJNumber && (
-                <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px" }}>
+                <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>
                   {errors.residentJNumber}
                 </p>
               )}
             </div>
-            <div style={{ gridColumn: "1 / span 2" }}>
-              <label style={{ fontWeight: "500" }}>
+            <div>
+              <label style={{ 
+                fontWeight: "500",
+                fontSize: "14px",
+                display: "block",
+                marginBottom: "6px"
+              }}>
                 Resident Email <span style={{ color: "red" }}>*</span>
               </label>
               <input
@@ -597,40 +647,42 @@ export default function RAPage() {
                 placeholder="student@university.edu"
                 style={{ 
                   width: "100%",
-                  padding: "8px",
+                  padding: "10px",
                   border: errors.residentEmail ? "2px solid #f44336" : "1px solid #ddd",
-                  borderRadius: "4px"
+                  borderRadius: "4px",
+                  fontSize: "16px",
+                  boxSizing: "border-box"
                 }}
               />
               {errors.residentEmail && (
-                <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px" }}>
+                <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>
                   {errors.residentEmail}
                 </p>
               )}
             </div>
           </div>
           
-          {/* Inspection Status */}
-          <h3 style={{ marginTop: "20px" }}>
+          {/* Inspection Status - Stack vertically on mobile */}
+          <h3 style={{ margin: "20px 0 8px 0", fontSize: "18px" }}>
             Inspection Status <span style={{ color: "red" }}>*</span>
           </h3>
           {errors.inspectionStatus && (
-            <p style={{ color: "#f44336", fontSize: "13px", marginBottom: "8px" }}>
+            <p style={{ color: "#f44336", fontSize: "13px", margin: "0 0 8px 0" }}>
               {errors.inspectionStatus}
             </p>
           )}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: "16px",
+              gridTemplateColumns: "1fr",
+              gap: "12px",
             }}
           >
             {/* PASSED */}
             <div
               onClick={() => handleInspectionStatusChange("Passed")}
               style={{
-                padding: "20px",
+                padding: "16px",
                 borderRadius: "8px",
                 background: inspectionStatus === "Passed" ? "#4caf50" : "#c8e6c9",
                 color: "white",
@@ -639,13 +691,12 @@ export default function RAPage() {
                 border: errors.inspectionStatus && !inspectionStatus ? "2px solid #f44336" : "none",
               }}
             >
-              <div style={{ fontSize: "18px", marginBottom: "8px" }}>
+              <div style={{ fontSize: "16px", marginBottom: "6px" }}>
                 Room Passed Inspection
               </div>
-              <div style={{ fontSize: "14px", opacity: 0.9 }}>
+              <div style={{ fontSize: "13px", opacity: 0.9, lineHeight: "1.4" }}>
                 The room was found in good condition. No violations, no
                 cleanliness issues, and no maintenance concerns were observed.
-                No further action is required.
               </div>
             </div>
             
@@ -653,7 +704,7 @@ export default function RAPage() {
             <div
               onClick={() => handleInspectionStatusChange("Failed")}
               style={{
-                padding: "20px",
+                padding: "16px",
                 borderRadius: "8px",
                 background: inspectionStatus === "Failed" ? "#f44336" : "#ffcdd2",
                 color: "white",
@@ -662,14 +713,12 @@ export default function RAPage() {
                 border: errors.inspectionStatus && !inspectionStatus ? "2px solid #f44336" : "none",
               }}
             >
-              <div style={{ fontSize: "18px", marginBottom: "8px" }}>
+              <div style={{ fontSize: "16px", marginBottom: "6px" }}>
                 Room Failed Inspection
               </div>
-              <div style={{ fontSize: "14px", opacity: 0.9 }}>
+              <div style={{ fontSize: "13px", opacity: 0.9, lineHeight: "1.4" }}>
                 The room was found in poor condition and did not meet the
-                required cleanliness or safety standards. The resident will
-                automatically receive a notification that they failed their room
-                check.
+                required cleanliness or safety standards.
               </div>
             </div>
             
@@ -677,7 +726,7 @@ export default function RAPage() {
             <div
               onClick={() => handleInspectionStatusChange("Maintenance Concern")}
               style={{
-                padding: "20px",
+                padding: "16px",
                 borderRadius: "8px",
                 background:
                   inspectionStatus === "Maintenance Concern"
@@ -689,31 +738,30 @@ export default function RAPage() {
                 border: errors.inspectionStatus && !inspectionStatus ? "2px solid #f44336" : "none",
               }}
             >
-              <div style={{ fontSize: "18px", marginBottom: "8px" }}>
+              <div style={{ fontSize: "16px", marginBottom: "6px" }}>
                 Room Has Maintenance Concerns
               </div>
-              <div style={{ fontSize: "14px", opacity: 0.9 }}>
+              <div style={{ fontSize: "13px", opacity: 0.9, lineHeight: "1.4" }}>
                 The room requires maintenance attention. This may include mold,
-                broken appliances, water damage, HVAC issues, pest concerns, or
-                electrical issues.
+                broken appliances, water damage, or HVAC issues.
               </div>
             </div>
           </div>
           
           {/* Failure Reasons */}
           {inspectionStatus === "Failed" && (
-            <div style={{ marginTop: "20px" }}>
-              <h3>
+            <div style={{ marginTop: "16px" }}>
+              <h3 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>
                 Reasons for Failure <span style={{ color: "red" }}>*</span>
               </h3>
               {errors.failureReasons && (
-                <p style={{ color: "#f44336", fontSize: "13px", marginBottom: "8px" }}>
+                <p style={{ color: "#f44336", fontSize: "13px", margin: "0 0 8px 0" }}>
                   {errors.failureReasons}
                 </p>
               )}
               <div style={{ 
                 background: "#fff3e0", 
-                padding: "16px", 
+                padding: "12px", 
                 borderRadius: "6px",
                 border: errors.failureReasons ? "2px solid #f44336" : "1px solid #ffb74d"
               }}>
@@ -732,20 +780,23 @@ export default function RAPage() {
                       display: "flex", 
                       alignItems: "center", 
                       cursor: "pointer",
-                      color: "#333"
+                      color: "#333",
+                      fontSize: "14px"
                     }}>
                       <input
                         type="checkbox"
                         checked={failureReasons.includes(reason)}
                         onChange={() => toggleFailureReason(reason)}
-                        style={{ marginRight: "8px", cursor: "pointer" }}
+                        style={{ marginRight: "8px", cursor: "pointer", minWidth: "16px" }}
                       />
-                      {reason}
+                      <span>{reason}</span>
                     </label>
                   </div>
                 ))}
                 <div style={{ marginTop: "10px" }}>
-                  <label style={{ color: "#333", fontWeight: "500" }}>Other (specify)</label>
+                  <label style={{ color: "#333", fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "4px" }}>
+                    Other (specify)
+                  </label>
                   <input
                     type="text"
                     onKeyDown={(e) => {
@@ -766,7 +817,8 @@ export default function RAPage() {
                       padding: "8px",
                       border: "1px solid #ddd",
                       borderRadius: "4px",
-                      marginTop: "4px"
+                      fontSize: "14px",
+                      boxSizing: "border-box"
                     }}
                   />
                 </div>
@@ -776,18 +828,18 @@ export default function RAPage() {
           
           {/* Maintenance Issues */}
           {inspectionStatus === "Maintenance Concern" && (
-            <div style={{ marginTop: "20px" }}>
-              <h3>
+            <div style={{ marginTop: "16px" }}>
+              <h3 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>
                 Maintenance Issues <span style={{ color: "red" }}>*</span>
               </h3>
               {errors.maintenanceIssues && (
-                <p style={{ color: "#f44336", fontSize: "13px", marginBottom: "8px" }}>
+                <p style={{ color: "#f44336", fontSize: "13px", margin: "0 0 8px 0" }}>
                   {errors.maintenanceIssues}
                 </p>
               )}
               <div style={{ 
                 background: "#fff3e0", 
-                padding: "16px", 
+                padding: "12px", 
                 borderRadius: "6px",
                 border: errors.maintenanceIssues ? "2px solid #f44336" : "1px solid #ffb74d"
               }}>
@@ -806,20 +858,23 @@ export default function RAPage() {
                       display: "flex", 
                       alignItems: "center", 
                       cursor: "pointer",
-                      color: "#333"
+                      color: "#333",
+                      fontSize: "14px"
                     }}>
                       <input
                         type="checkbox"
                         checked={maintenanceIssues.includes(issue)}
                         onChange={() => toggleMaintenanceIssue(issue)}
-                        style={{ marginRight: "8px", cursor: "pointer" }}
+                        style={{ marginRight: "8px", cursor: "pointer", minWidth: "16px" }}
                       />
-                      {issue}
+                      <span>{issue}</span>
                     </label>
                   </div>
                 ))}
                 <div style={{ marginTop: "10px" }}>
-                  <label style={{ color: "#333", fontWeight: "500" }}>Other (specify)</label>
+                  <label style={{ color: "#333", fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "4px" }}>
+                    Other (specify)
+                  </label>
                   <input
                     type="text"
                     onKeyDown={(e) => {
@@ -840,7 +895,8 @@ export default function RAPage() {
                       padding: "8px",
                       border: "1px solid #ddd",
                       borderRadius: "4px",
-                      marginTop: "4px"
+                      fontSize: "14px",
+                      boxSizing: "border-box"
                     }}
                   />
                 </div>
@@ -849,26 +905,30 @@ export default function RAPage() {
           )}
           
           {/* Notes */}
-          <div style={{ marginTop: "20px" }}>
-            <label style={{ fontWeight: "500" }}>Notes (Optional)</label>
+          <div style={{ marginTop: "16px" }}>
+            <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>
+              Notes (Optional)
+            </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Additional comments or observations..."
               style={{ 
                 width: "100%",
-                padding: "8px",
+                padding: "10px",
                 border: "1px solid #ddd",
                 borderRadius: "4px",
                 minHeight: "80px",
-                fontFamily: "inherit"
+                fontFamily: "inherit",
+                fontSize: "14px",
+                boxSizing: "border-box"
               }}
             />
           </div>
           
           {/* File Upload */}
-          <div style={{ marginTop: "20px" }}>
-            <label style={{ fontWeight: "500" }}>
+          <div style={{ marginTop: "16px" }}>
+            <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>
               Choose Images <span style={{ color: "red" }}>*</span>
             </label>
             <input 
@@ -878,19 +938,20 @@ export default function RAPage() {
               onChange={handleFileChange}
               style={{ 
                 display: "block",
-                marginTop: "8px",
                 padding: "8px",
                 border: errors.files ? "2px solid #f44336" : "1px solid #ddd",
                 borderRadius: "4px",
-                width: "100%"
+                width: "100%",
+                boxSizing: "border-box",
+                fontSize: "14px"
               }}
             />
             {errors.files && (
-              <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px" }}>
+              <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>
                 {errors.files}
               </p>
             )}
-            <p style={{ fontSize: "13px", color: "#666", marginTop: "4px" }}>
+            <p style={{ fontSize: "12px", color: "#666", margin: "4px 0 0 0" }}>
               Maximum file size: 10MB per image
             </p>
           </div>
@@ -899,10 +960,10 @@ export default function RAPage() {
           {previews.length > 0 && (
             <div
               style={{
-                marginTop: "20px",
+                marginTop: "16px",
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-                gap: "12px",
+                gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+                gap: "10px",
               }}
             >
               {previews.map((src, i) => (
@@ -920,7 +981,7 @@ export default function RAPage() {
                     alt={`preview ${i + 1}`}
                     style={{
                       width: "100%",
-                      height: "120px",
+                      height: "100px",
                       objectFit: "cover",
                     }}
                   />
@@ -941,6 +1002,7 @@ export default function RAPage() {
                       justifyContent: "center",
                       fontSize: "16px",
                       fontWeight: "bold",
+                      padding: "0"
                     }}
                     aria-label="Remove image"
                   >
@@ -961,7 +1023,7 @@ export default function RAPage() {
             marginBottom: "12px",
             textAlign: "center"
           }}>
-            <p style={{ marginBottom: "8px", color: "#666" }}>
+            <p style={{ marginBottom: "8px", color: "#666", fontSize: "14px", margin: "0 0 8px 0" }}>
               Uploading image {uploadProgress.current} of {uploadProgress.total}...
             </p>
             <div style={{
@@ -995,6 +1057,7 @@ export default function RAPage() {
             cursor: uploading ? "not-allowed" : "pointer",
             fontSize: "16px",
             fontWeight: "500",
+            boxSizing: "border-box"
           }}
         >
           {uploading ? "Uploading..." : "Upload"}
@@ -1012,6 +1075,7 @@ export default function RAPage() {
             borderRadius: "6px",
             cursor: "pointer",
             fontSize: "14px",
+            boxSizing: "border-box"
           }}
         >
           Sign out

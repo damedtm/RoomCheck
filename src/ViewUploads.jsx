@@ -10,7 +10,7 @@ export default function ViewUploads({
   onDelete,
   deleting
 }) {
-  const [sortStatus, setSortStatus] = useState("none");
+  const [sortInspection, setSortInspection] = useState("none");
   const [sortDate, setSortDate] = useState("newest");
   const [modalImage, setModalImage] = useState(null);
 
@@ -60,15 +60,21 @@ export default function ViewUploads({
   // -----------------------------
   let sorted = [...filtered];
 
-  if (sortStatus !== "none") {
-    sorted.sort((a, b) => {
-      const aMatch = a.inspectionStatus === sortStatus ? 1 : 0;
-      const bMatch = b.inspectionStatus === sortStatus ? 1 : 0;
-      return bMatch - aMatch;
-    });
-  }
-
+  // Combined sort: inspection status (primary) + date (secondary)
   sorted.sort((a, b) => {
+    // First, sort by inspection status if selected
+    if (sortInspection !== "none") {
+      const aMatch = a.inspectionStatus === sortInspection ? 1 : 0;
+      const bMatch = b.inspectionStatus === sortInspection ? 1 : 0;
+      
+      // If one matches and the other doesn't, prioritize the match
+      if (aMatch !== bMatch) {
+        return bMatch - aMatch;
+      }
+      // If both match or both don't match, continue to date sort
+    }
+
+    // Then sort by date (secondary sort)
     const dateA = new Date(a.uploadedAt);
     const dateB = new Date(b.uploadedAt);
     return sortDate === "newest" ? dateB - dateA : dateA - dateB;
@@ -87,7 +93,7 @@ export default function ViewUploads({
   return (
     <div style={{ width: "100%", overflowX: "auto" }}>
       {/* SEARCH + SORT */}
-      <div style={{ marginBottom: "20px", display: "flex", gap: "10px" }}>
+      <div style={{ marginBottom: "20px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
         <input
           type="text"
           placeholder="Search reports..."
@@ -97,20 +103,22 @@ export default function ViewUploads({
             padding: "10px",
             width: "300px",
             borderRadius: "6px",
-            border: "1px solid #ccc"
+            border: "1px solid #ccc",
+            fontSize: "14px"
           }}
         />
 
         <select
-          value={sortStatus}
-          onChange={(e) => setSortStatus(e.target.value)}
+          value={sortInspection}
+          onChange={(e) => setSortInspection(e.target.value)}
           style={{
             padding: "10px",
             borderRadius: "6px",
-            border: "1px solid #ccc"
+            border: "1px solid #ccc",
+            fontSize: "14px"
           }}
         >
-          <option value="none">Sort by Status</option>
+          <option value="none">Sort by Inspection</option>
           <option value="Passed">Passed First</option>
           <option value="Failed">Failed First</option>
           <option value="Maintenance Concern">Maintenance First</option>
@@ -122,7 +130,8 @@ export default function ViewUploads({
           style={{
             padding: "10px",
             borderRadius: "6px",
-            border: "1px solid #ccc"
+            border: "1px solid #ccc",
+            fontSize: "14px"
           }}
         >
           <option value="newest">Newest First</option>
@@ -140,15 +149,15 @@ export default function ViewUploads({
       >
         <thead>
           <tr style={{ textAlign: "left", fontWeight: 600 }}>
-            <th>Actions</th>
-            <th>RA</th>
-            <th>Dorm</th>
-            <th>Room</th>
-            <th>Resident</th>
-            <th>Status</th>
-            <th>Issues</th>
-            <th>Notes</th>
-            <th>Uploaded</th>
+            <th style={{ padding: "12px" }}>Actions</th>
+            <th style={{ padding: "12px" }}>RA</th>
+            <th style={{ padding: "12px" }}>Dorm</th>
+            <th style={{ padding: "12px" }}>Room</th>
+            <th style={{ padding: "12px" }}>Resident</th>
+            <th style={{ padding: "12px" }}>Inspection</th>
+            <th style={{ padding: "12px" }}>Issues</th>
+            <th style={{ padding: "12px" }}>Notes</th>
+            <th style={{ padding: "12px" }}>Uploaded</th>
           </tr>
         </thead>
 
@@ -242,12 +251,12 @@ export default function ViewUploads({
                 </div>
               </td>
 
-              {/* STATUS */}
+              {/* INSPECTION STATUS */}
               <td style={{ padding: "12px" }}>
                 <span
                   style={{
-                    padding: "4px 8px",
-                    borderRadius: "4px",
+                    padding: "6px 12px",
+                    borderRadius: "6px",
                     background:
                       u.inspectionStatus === "Passed"
                         ? "#16a34a22"
@@ -261,25 +270,28 @@ export default function ViewUploads({
                         ? "#991b1b"
                         : "#92400e",
                     fontWeight: 600,
-                    fontSize: "12px"
+                    fontSize: "13px",
+                    display: "inline-block"
                   }}
                 >
-                  {u.inspectionStatus}
+                  {u.inspectionStatus || "Not Set"}
                 </span>
               </td>
 
               {/* ISSUES */}
               <td style={{ padding: "12px" }}>
-                {u.maintenanceIssues.length === 0
-                  ? "None"
-                  : u.maintenanceIssues.join(", ")}
+                {u.maintenanceIssues && u.maintenanceIssues.length > 0
+                  ? u.maintenanceIssues.join(", ")
+                  : "None"}
               </td>
 
               {/* NOTES */}
-              <td style={{ padding: "12px" }}>{u.notes}</td>
+              <td style={{ padding: "12px", maxWidth: "200px" }}>
+                {u.notes || "-"}
+              </td>
 
               {/* DATE */}
-              <td style={{ padding: "12px" }}>
+              <td style={{ padding: "12px", whiteSpace: "nowrap" }}>
                 {new Date(u.uploadedAt).toLocaleString()}
               </td>
             </tr>
@@ -287,47 +299,69 @@ export default function ViewUploads({
         </tbody>
       </table>
 
+      {/* NO RESULTS MESSAGE */}
+      {paginated.length === 0 && (
+        <div
+          style={{
+            background: "white",
+            padding: "40px",
+            borderRadius: "8px",
+            textAlign: "center",
+            color: "#666"
+          }}
+        >
+          <p style={{ fontSize: "16px", margin: 0 }}>
+            {search ? "No results found for your search." : "No uploads yet."}
+          </p>
+        </div>
+      )}
+
       {/* PAGINATION */}
-      <div
-        style={{
-          marginTop: "20px",
-          display: "flex",
-          justifyContent: "center",
-          gap: "10px"
-        }}
-      >
-        <button
-          disabled={page === 1}
-          onClick={() => setPage(page - 1)}
+      {totalPages > 1 && (
+        <div
           style={{
-            padding: "8px 12px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-            background: page === 1 ? "#eee" : "white",
-            cursor: page === 1 ? "not-allowed" : "pointer"
+            marginTop: "20px",
+            display: "flex",
+            justifyContent: "center",
+            gap: "10px",
+            alignItems: "center"
           }}
         >
-          Prev
-        </button>
+          <button
+            disabled={page === 1}
+            onClick={() => setPage(page - 1)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "6px",
+              border: "1px solid #ccc",
+              background: page === 1 ? "#eee" : "white",
+              cursor: page === 1 ? "not-allowed" : "pointer",
+              fontSize: "14px"
+            }}
+          >
+            Prev
+          </button>
 
-        <span style={{ padding: "8px 12px" }}>
-          Page {page} of {totalPages}
-        </span>
+          <span style={{ padding: "8px 12px", fontSize: "14px" }}>
+            Page {page} of {totalPages}
+          </span>
 
-        <button
-          disabled={page === totalPages}
-          onClick={() => setPage(page + 1)}
-          style={{
-            padding: "8px 12px",
-            borderRadius: "6px",
-            border: "1px solid #ccc",
-            background: page === totalPages ? "#eee" : "white",
-            cursor: page === totalPages ? "not-allowed" : "pointer"
-          }}
-        >
-          Next
-        </button>
-      </div>
+          <button
+            disabled={page === totalPages}
+            onClick={() => setPage(page + 1)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: "6px",
+              border: "1px solid #ccc",
+              background: page === totalPages ? "#eee" : "white",
+              cursor: page === totalPages ? "not-allowed" : "pointer",
+              fontSize: "14px"
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* IMAGE MODAL */}
       {modalImage && (
@@ -350,13 +384,32 @@ export default function ViewUploads({
           <img
             src={modalImage}
             alt="Full View"
+            onClick={(e) => e.stopPropagation()}
             style={{
               maxWidth: "90%",
               maxHeight: "90%",
               borderRadius: "8px",
-              boxShadow: "0 0 20px rgba(0,0,0,0.5)"
+              boxShadow: "0 0 20px rgba(0,0,0,0.5)",
+              cursor: "default"
             }}
           />
+          <button
+            onClick={() => setModalImage(null)}
+            style={{
+              position: "absolute",
+              top: "20px",
+              right: "20px",
+              padding: "10px 20px",
+              background: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontSize: "16px",
+              fontWeight: 600
+            }}
+          >
+            ✕ Close
+          </button>
         </div>
       )}
     </div>
