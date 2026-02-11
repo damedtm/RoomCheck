@@ -8,8 +8,8 @@ import {
   Navigate,
   useNavigate,
 } from "react-router-dom";
-import RAPage from "./RAPage";
-import AdminPage from "./AdminPage";
+import RAPage from "./components/ra/RAPage";
+import AdminPage from "./components/admin/AdminPage";
 
 /* ===== Protected Route ===== */
 function ProtectedRoute({ children, allowedGroups }) {

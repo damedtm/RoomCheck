@@ -6,7 +6,7 @@ import { useAuth } from "react-oidc-context";
 import AddUserForm from "./AddUserForm";
 import ManageUsersTable from "./ManageUsersTable";
 import ViewUploads from "./ViewUploads";
-import { getUploads, createUser, deleteUpload } from "./api";
+import { getUploads, createUser, deleteUpload } from "../../utils/api";
 
 const DORMS = [
   "Alexander Hall",

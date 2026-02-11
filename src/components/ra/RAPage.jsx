@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "react-oidc-context";
+import { uploadRoom } from "../../utils/api";
 
-const API_URL = "https://ndd3vawb71.execute-api.us-east-2.amazonaws.com/prod/upload";
 const DORMS = [
   "Alexander Hall",
   "Campbell South",
@@ -15,7 +15,7 @@ const DORMS = [
 ];
 
 // Helper function to get user-friendly error messages
-function getErrorMessage(error, response) {
+function getErrorMessage(error) {
   if (!error) return "Upload failed. Please try again.";
   
   if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
@@ -196,53 +196,26 @@ export default function RAPage() {
     }
   };
 
-  const uploadSingleImage = async (imageBase64, imageIndex, totalImages) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
+  const uploadSingleImage = async (imageBase64) => {
     try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dorm,
-          room,
-          notes,
-          imageBase64,
-          uploadedByUserId,
-          uploadedByName,
-          residentName,
-          residentJNumber,
-          residentEmail,
-          inspectionStatus,
-          maintenanceIssues: inspectionStatus === "Maintenance Concern" ? maintenanceIssues : [],
-          failureReasons: inspectionStatus === "Failed" ? failureReasons : [],
-        }),
-        signal: controller.signal
-      });
+      const formData = {
+        dorm,
+        room,
+        notes,
+        imageBase64,
+        uploadedByUserId,
+        uploadedByName,
+        residentName,
+        residentJNumber,
+        residentEmail,
+        inspectionStatus,
+        maintenanceIssues: inspectionStatus === "Maintenance Concern" ? maintenanceIssues : [],
+        failureReasons: inspectionStatus === "Failed" ? failureReasons : [],
+      };
 
-      clearTimeout(timeoutId);
-
-      let errorData = null;
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        // Response might not be JSON
-      }
-
-      if (!response.ok) {
-        const errorMessage = errorData?.message || errorData?.error || `HTTP error! status: ${response.status}`;
-        throw new Error(errorMessage);
-      }
-
-      return errorData;
+      const result = await uploadRoom(formData, auth.user.id_token);
+      return result;
     } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error.name === 'AbortError') {
-        throw new Error('Request timed out after 30 seconds. Please try again.');
-      }
-      
       throw error;
     }
   };
@@ -269,7 +242,7 @@ export default function RAPage() {
         setUploadProgress({ current: i + 1, total: base64Images.length });
         
         try {
-          const result = await uploadSingleImage(base64Images[i], i, base64Images.length);
+          const result = await uploadSingleImage(base64Images[i]);
           results.push(result);
         } catch (error) {
           throw new Error(`Failed to upload image ${i + 1} of ${base64Images.length}: ${error.message}`);
