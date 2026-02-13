@@ -244,17 +244,16 @@ export const bulkDeleteUploads = async (uploads, idToken, onProgress) => {
   return results;
 };
 
-// Create user (admin)
+// Create user (admin) - FIXED: removed sanitization
 export const createUser = async (userData, idToken) => {
   try {
-    const sanitizedData = sanitizeInput(userData);
     const response = await apiCall(`${API_BASE_URL}${config.api.endpoints.createUser}`, {
       method: 'POST',
       headers: {
         'Authorization': idToken,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(sanitizedData)
+      body: JSON.stringify(userData)
     });
     return await response.json();
   } catch (error) {
@@ -281,17 +280,16 @@ export const getUsers = async (idToken) => {
   }
 };
 
-// Delete user (admin)
+// Delete user (admin) - FIXED: removed sanitization
 export const deleteUser = async (username, idToken) => {
   try {
-    const sanitizedUsername = sanitizeInput(username);
     const response = await apiCall(`${API_BASE_URL}${config.api.endpoints.deleteUser}`, {
       method: 'DELETE',
       headers: {
         'Authorization': idToken,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ username: sanitizedUsername })
+      body: JSON.stringify({ username })
     });
     return await response.json();
   } catch (error) {
