@@ -5,7 +5,7 @@
   "dependencies": {
     "@aws-sdk/client-cognito-identity": "^3.972.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.985.0",
-    "@aws-sdk/client-dynamodb": "^3.972.0",
+    "@aws-sdk/client-dynamodb": "^3.990.0",
     "@aws-sdk/client-s3": "^3.972.0",
     "@aws-sdk/credential-providers": "^3.972.0",
     "@aws-sdk/lib-storage": "^3.972.0",
@@ -53,5 +53,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "description": "A comprehensive web application for managing dorm room inspections, built with React and AWS services. This system enables Resident Assistants (RAs) to conduct and document room inspections, while administrators can review, manage, and export inspection data.",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

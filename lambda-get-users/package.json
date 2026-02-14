@@ -1,0 +1,17 @@
+{
+  "name": "lambda-get-users",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.990.0",
+    "jsonwebtoken": "^9.0.3",
+    "jwks-rsa": "^3.2.2"
+  },
+  "description": ""
+}

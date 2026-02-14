@@ -262,9 +262,11 @@ export const createUser = async (userData, idToken) => {
   }
 };
 
-// Get all users (admin)
+// Get all users (admin) - UPDATED to handle both array and object responses
 export const getUsers = async (idToken) => {
   try {
+    console.log('🔍 Fetching users...');
+    
     const response = await apiCall(`${API_BASE_URL}${config.api.endpoints.getUsers}`, {
       method: 'GET',
       headers: {
@@ -272,10 +274,25 @@ export const getUsers = async (idToken) => {
         'Content-Type': 'application/json'
       }
     });
+    
     const data = await response.json();
-    return data.users || [];
+    console.log('✅ API response:', data);
+    
+    // Handle both formats:
+    // 1. Array response: [user1, user2, ...]
+    // 2. Object response: { users: [...], count: 3 }
+    if (Array.isArray(data)) {
+      console.log(`📦 Received ${data.length} users (array format)`);
+      return data;
+    } else if (data.users && Array.isArray(data.users)) {
+      console.log(`📦 Received ${data.users.length} users (object format)`);
+      return data.users;
+    } else {
+      console.warn('⚠️ Unexpected response format:', data);
+      return [];
+    }
   } catch (error) {
-    console.error('Get users error:', error);
+    console.error('❌ Get users error:', error);
     throw new Error(error.message || 'Failed to fetch users');
   }
 };

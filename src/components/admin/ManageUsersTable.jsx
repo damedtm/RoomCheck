@@ -1,12 +1,12 @@
-// ManageUsersTable.jsx - FIXED VERSION
-// Uses backend API instead of direct DynamoDB access
+// ManageUsersTable.jsx - DIAGNOSTIC VERSION
+// Adds detailed console logging to help identify the issue
 
 import React, { useEffect, useState } from "react";
-import { useAuth } from "../../contexts/AuthContext"; // FIXED: Changed from react-oidc-context
+import { useAuth } from "../../contexts/AuthContext";
 import { getUsers, deleteUser } from "../../utils/api";
 
 export default function ManageUsersTable() {
-  const { isAuthenticated, user, loading: authLoading } = useAuth(); // FIXED: Use AuthContext
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,22 +23,36 @@ export default function ManageUsersTable() {
         setLoading(true);
         setError(null);
         
-        const fetchedUsers = await getUsers(user.id_token); // FIXED: Use user.id_token
+        console.log("🔍 Fetching users...");
+        console.log("Auth status:", { isAuthenticated, hasUser: !!user, hasToken: !!user?.id_token });
+        
+        const fetchedUsers = await getUsers(user.id_token);
+        
+        console.log("✅ Users fetched successfully:", fetchedUsers);
+        console.log("📊 User count:", fetchedUsers.length);
+        console.log("📋 First user sample:", fetchedUsers[0]);
+        
         setUsers(fetchedUsers);
       } catch (err) {
-        console.error("Error fetching users:", err);
+        console.error("❌ Error fetching users:", err);
+        console.error("Error details:", {
+          message: err.message,
+          stack: err.stack,
+          response: err.response
+        });
         setError(err.message);
       } finally {
         setLoading(false);
       }
     }
 
-    if (isAuthenticated && user) { // FIXED: Check both
+    if (isAuthenticated && user) {
       fetchUsers();
     } else {
+      console.log("⚠️ Not authenticated or no user");
       setLoading(false);
     }
-  }, [isAuthenticated, user]); // FIXED: Updated dependencies
+  }, [isAuthenticated, user]);
 
   function paginate(list) {
     const start = (currentPage - 1) * USERS_PER_PAGE;
@@ -54,7 +68,7 @@ export default function ManageUsersTable() {
     setDeleting(true);
     
     try {
-      await deleteUser(username, user.id_token); // FIXED: Use user.id_token
+      await deleteUser(username, user.id_token);
       
       // Remove from local state
       setUsers(prev => prev.filter(u => u.username !== username));
@@ -112,6 +126,18 @@ export default function ManageUsersTable() {
         <div style={{ fontSize: 48, marginBottom: 10 }}>✗</div>
         <h3 style={{ color: "#c00", marginBottom: 10 }}>Failed to Load Users</h3>
         <p style={{ color: "#666", marginBottom: 20 }}>{error}</p>
+        <div style={{ 
+          background: "#fff", 
+          padding: "15px", 
+          borderRadius: "6px", 
+          marginBottom: "20px",
+          textAlign: "left",
+          fontSize: "12px",
+          fontFamily: "monospace"
+        }}>
+          <strong>Debug Info:</strong><br/>
+          Check browser console (F12) for detailed error logs
+        </div>
         <button
           onClick={() => window.location.reload()}
           style={{
@@ -131,8 +157,19 @@ export default function ManageUsersTable() {
     );
   }
 
+  console.log("📊 Current state:", {
+    totalUsers: users.length,
+    view,
+    currentPage
+  });
+
   const admins = users.filter((u) => u.role?.toLowerCase().includes("admin"));
   const ras = users.filter((u) => u.role?.toLowerCase().includes("ra"));
+
+  console.log("👥 Filtered users:", {
+    admins: admins.length,
+    ras: ras.length
+  });
 
   const buttonStyle = {
     padding: "6px 12px",
@@ -172,6 +209,21 @@ export default function ManageUsersTable() {
     <div style={{ background: "white", padding: 20, borderRadius: 8 }}>
       <h2 style={{ marginBottom: 20 }}>Manage Users</h2>
 
+      {/* Debug Panel */}
+      <div style={{
+        background: "#f0f8ff",
+        border: "1px solid #b3d9ff",
+        padding: "15px",
+        borderRadius: "6px",
+        marginBottom: "20px",
+        fontSize: "13px"
+      }}>
+        <strong>🔍 Debug Info:</strong><br/>
+        Total Users: {users.length} | Admins: {admins.length} | RAs: {ras.length}<br/>
+        Current View: {view} | Showing: {list.length} users<br/>
+        Open browser console (F12) for detailed logs
+      </div>
+
       <div style={{ marginBottom: 20 }}>
         <button
           onClick={() => {
@@ -202,9 +254,23 @@ export default function ManageUsersTable() {
       </h3>
 
       {list.length === 0 ? (
-        <p style={{ color: "#666", padding: 20 }}>
-          No {view === "admins" ? "administrators" : "RAs"} found.
-        </p>
+        <div style={{ 
+          background: "#fff3cd", 
+          border: "1px solid #ffc107",
+          padding: "20px", 
+          borderRadius: "6px",
+          textAlign: "center"
+        }}>
+          <p style={{ color: "#856404", margin: 0 }}>
+            No {view === "admins" ? "administrators" : "RAs"} found.
+          </p>
+          <p style={{ color: "#856404", fontSize: "12px", marginTop: "10px" }}>
+            This could mean:<br/>
+            • The API returned {users.length} total users<br/>
+            • None have role matching "{view === "admins" ? "admin" : "ra"}"<br/>
+            • Check the browser console for the actual user data
+          </p>
+        </div>
       ) : (
         <>
           <div style={{ overflowX: "auto" }}>
@@ -227,7 +293,7 @@ export default function ManageUsersTable() {
               </thead>
               <tbody>
                 {paginate(list).map((u, index) => (
-                  <tr key={u.username || index} style={tableRowStyle}>
+                  <tr key={u.username || u.userId || index} style={tableRowStyle}>
                     <td style={tableCellStyle}>{u.email || u.username}</td>
                     {view === "ras" && (
                       <td style={tableCellStyle}>{u.dorm || "-"}</td>
@@ -252,7 +318,7 @@ export default function ManageUsersTable() {
                         fontSize: 12,
                         fontWeight: 500
                       }}>
-                        {u.enabled ? "Active" : "Disabled"}
+                        {u.enabled !== undefined ? (u.enabled ? "Active" : "Disabled") : "Unknown"}
                       </span>
                     </td>
                     <td style={tableCellStyle}>
@@ -268,7 +334,7 @@ export default function ManageUsersTable() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(u.username, u.email)}
+                          onClick={() => handleDelete(u.username || u.userId, u.email)}
                           disabled={deleting}
                           style={{
                             ...dangerButtonStyle,
