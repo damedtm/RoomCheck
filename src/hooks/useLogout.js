@@ -8,8 +8,7 @@ export default function useLogout() {
 
   const handleLogout = () => {
     logout();
-    // replace: true removes dashboard from history
-    // back button cannot return to the dashboard after logout
+    
     navigate('/login', { replace: true });
   };
 

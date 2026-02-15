@@ -109,8 +109,7 @@ export function AuthProvider({ children }) {
           reject(err);
         },
 
-        // FIXED: no longer throws an error
-        // Stores the pending session and signals UI to show change-password form
+       
         newPasswordRequired: (userAttributes) => {
           console.log('AuthProvider: New password required');
           setAuth(prev => ({
@@ -126,7 +125,7 @@ export function AuthProvider({ children }) {
     });
   };
 
-  // Called from LoginPage when user submits their new password
+  
   const completePasswordChange = async (newPassword) => {
     return new Promise((resolve, reject) => {
       const { pendingCognitoUser, pendingUserAttributes } = auth;
@@ -136,7 +135,7 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      // Remove read-only attributes Cognito rejects
+      
       const cleanAttributes = { ...pendingUserAttributes };
       delete cleanAttributes.email_verified;
       delete cleanAttributes.email;

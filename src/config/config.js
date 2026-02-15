@@ -18,7 +18,7 @@ const config = {
       deleteUpload: '/admin/delete-upload',
       bulkDeleteUploads: '/admin/delete-upload',
       createUser: '/admin/create-user',
-      getUsers: '/admin/get-users',        // FIXED: was wrongly set to '/admin/delete-user'
+      getUsers: '/admin/get-users',      
       deleteUser: '/admin/delete-user',
       logError: '/log-error',
       health: '/health'

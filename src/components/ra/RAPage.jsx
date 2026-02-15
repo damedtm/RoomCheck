@@ -27,7 +27,7 @@ function getErrorMessage(error) {
 
 export default function RAPage() {
   const { isAuthenticated, user, loading } = useAuth();
-  const handleLogout = useLogout(); // FIXED: uses useLogout hook for secure logout
+  const handleLogout = useLogout();
 
   const [dorm, setDorm] = useState("");
   const [room, setRoom] = useState("");
@@ -226,7 +226,7 @@ export default function RAPage() {
     );
   }
 
-  // ProtectedRoute handles redirect, keep as safety net
+  
   if (!isAuthenticated) return null;
 
   return (
@@ -412,7 +412,7 @@ export default function RAPage() {
           {uploading ? "Uploading..." : "Upload"}
         </button>
 
-        {/* FIXED: uses handleLogout from useLogout hook */}
+       
         <button onClick={handleLogout} style={{ width: "100%", marginTop: "12px", padding: "12px", border: "1px solid #444", background: "white", borderRadius: "6px", cursor: "pointer", fontSize: "14px", boxSizing: "border-box" }}>
           Sign out
         </button>

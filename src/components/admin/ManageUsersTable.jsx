@@ -44,7 +44,7 @@ export default function ManageUsersTable() {
     return list.slice(start, start + USERS_PER_PAGE);
   }
 
-  // FIXED: accepts email as second param and passes it to deleteUser API call
+ 
   async function handleDelete(userId, email) {
     const confirmed = window.confirm(
       `Are you sure you want to delete user ${email}?\n\nThis action cannot be undone.`
@@ -54,16 +54,16 @@ export default function ManageUsersTable() {
     setDeleting(true);
 
     try {
-      // FIXED: pass userId, email, AND idToken — all three required
+      
       await deleteUser(userId, email, user.id_token);
 
-      // Only remove from local state AFTER confirmed success
+     
       setUsers(prev => prev.filter(u => u.userId !== userId));
 
       alert("✓ User deleted successfully");
     } catch (err) {
       console.error("Delete error:", err);
-      // Show the actual error so you know what went wrong
+     
       alert(`✗ Failed to delete user\n\n${err.message}`);
     } finally {
       setDeleting(false);
@@ -195,7 +195,7 @@ export default function ManageUsersTable() {
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                         <button onClick={() => handleEdit(u)} style={buttonStyle}>Edit</button>
                         <button
-                          // FIXED: pass both u.userId and u.email
+                          
                           onClick={() => handleDelete(u.userId, u.email)}
                           disabled={deleting}
                           style={{ ...dangerButtonStyle, opacity: deleting ? 0.6 : 1, cursor: deleting ? "not-allowed" : "pointer" }}

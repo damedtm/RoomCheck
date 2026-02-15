@@ -7,7 +7,7 @@ export default function ProtectedRoute({ children, requiredRole }) {
   const { isAuthenticated, userRole, loading } = useAuth();
   const location = useLocation();
 
-  // Still checking auth — show spinner to prevent flash of login page
+  
   if (loading) {
     return (
       <div style={{
@@ -31,17 +31,17 @@ export default function ProtectedRoute({ children, requiredRole }) {
     );
   }
 
-  // Not logged in — redirect to login, replace so back button can't return
+  
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Wrong role — redirect to their correct dashboard
+  
   if (requiredRole && userRole !== requiredRole) {
     const correctPath = userRole === 'admin' ? '/admin' : '/ra';
     return <Navigate to={correctPath} replace />;
   }
 
-  // All good
+  
   return children;
 }

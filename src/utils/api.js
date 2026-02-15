@@ -260,8 +260,7 @@ export const getUsers = async (idToken) => {
   }
 };
 
-// Delete user (admin)
-// FIXED: now sends both userId AND email, which the Lambda requires
+
 export const deleteUser = async (userId, email, idToken) => {
   try {
     console.log('🗑️ Deleting user:', { userId, email });
@@ -272,7 +271,7 @@ export const deleteUser = async (userId, email, idToken) => {
         'Authorization': `Bearer ${idToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ userId, email })  // FIXED: Lambda requires both fields
+      body: JSON.stringify({ userId, email })  
     });
     return await response.json();
   } catch (error) {
