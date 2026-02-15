@@ -5,30 +5,75 @@ A comprehensive web application for managing dorm room inspections, built with R
 ## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Frontend (React)                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   RA Page    │  │  Admin Page  │  │  Auth (OIDC) │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    API Gateway (REST)                        │
-│                                                              │
-│  /upload-room    /admin/get-uploads    /create-user         │
-│  /admin/delete-upload                                        │
-└─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      AWS Services                            │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  DynamoDB    │  │   Cognito    │  │      S3      │      │
-│  │   Tables     │  │  User Pool   │  │Image Storage │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Frontend (React SPA)                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
+│  │   RA Page    │  │  Admin Page  │  │   Login      │          │
+│  │              │  │              │  │   (Cognito)  │          │
+│  └──────────────┘  └──────────────┘  └──────────────┘          │
+│                                                                  │
+│  Components:                                                     │
+│  • User Management  • Inspection Forms  • Data Tables           │
+│  • Image Upload     • CSV Export        • Search/Filter         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTPS (JWT Auth)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   API Gateway (REST API)                         │
+│                 lsnro81xgl.execute-api.us-east-2                │
+│                                                                  │
+│  Routes:                                                         │
+│  POST   /upload                  → Upload room inspection       │
+│  GET    /admin/get-uploads       → Fetch all inspections        │
+│  DELETE /admin/delete-upload     → Delete inspection record     │
+│  POST   /admin/create-user       → Create new user              │
+│  GET    /admin/get-users         → Fetch all users              │
+│  DELETE /admin/delete-user       → Delete user account          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ Lambda Invocation
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      AWS Lambda Functions                        │
+│                                                                  │
+│  • uploadRoomHandler      • getUploadsHandler                   │
+│  • deleteUploadHandler    • createUserHandler                   │
+│  • getUsersHandler        • deleteUserHandler                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                ┌─────────────┴─────────────┐
+                ▼                           ▼
+┌──────────────────────────┐  ┌────────────────────────┐
+│    AWS Cognito           │  │   Amazon DynamoDB      │
+│                          │  │                        │
+│  User Pool:              │  │  Tables:               │
+│  us-east-2_lk1vd8Mwx    │  │  • RoomCheckUploads    │
+│                          │  │  • RoomCheckUsers      │
+│  Identity Pool:          │  │                        │
+│  us-east-2:0d00064d...  │  │  Indexes:              │
+│                          │  │  • userId-uploadedAt   │
+│  Features:               │  │  • dorm-room           │
+│  • JWT tokens            │  │                        │
+│  • MFA support           │  └────────────────────────┘
+│  • Password policies     │              │
+│  • User groups           │              │
+└──────────────────────────┘              │
+                                          ▼
+                          ┌────────────────────────────┐
+                          │      Amazon S3             │
+                          │                            │
+                          │  Bucket:                   │
+                          │  roomcheck-photos-*        │
+                          │                            │
+                          │  Structure:                │
+                          │  /uploads/{userId}/{uuid}  │
+                          │                            │
+                          │  Features:                 │
+                          │  • Presigned URLs          │
+                          │  • Lifecycle policies      │
+                          │  • Versioning              │
+                          └────────────────────────────┘
 ```
 
 ## Features
