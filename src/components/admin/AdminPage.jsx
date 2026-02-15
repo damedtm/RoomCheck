@@ -1,5 +1,7 @@
+// src/pages/AdminPage/AdminPage.jsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import useLogout from "../../hooks/useLogout";
 
 import AddUserForm from "./AddUserForm";
 import ManageUsersTable from "./ManageUsersTable";
@@ -52,7 +54,8 @@ const DownloadIcon = ({ size = 18, color = "#fff" }) => (
 );
 
 export default function AdminPage() {
-  const { isAuthenticated, user, loading, logout } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+  const handleLogout = useLogout(); // FIXED: uses useLogout hook for secure logout
 
   const [selectedSection, setSelectedSection] = useState("reports");
   const [userAction, setUserAction] = useState("view");
@@ -95,16 +98,14 @@ export default function AdminPage() {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", flexDirection: "column", gap: "20px" }}>
         <div style={{ width: "50px", height: "50px", border: "4px solid #f3f3f3", borderTop: "4px solid #3498db", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
-        <div style={{ fontSize: "18px", color: "#666" }}>Loading authentication...</div>
+        <div style={{ fontSize: "18px", color: "#666" }}>Loading...</div>
         <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    window.location.href = "/login";
-    return null;
-  }
+  // ProtectedRoute handles unauthenticated redirect, but keep as safety net
+  if (!isAuthenticated) return null;
 
   const handleCreateUser = async (formData) => {
     setCreatingUser(true);
@@ -248,7 +249,8 @@ export default function AdminPage() {
             </div>
 
             <div style={{ marginTop: "30px" }}>
-              <button onClick={logout} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #444", background: "white", cursor: "pointer", fontSize: "14px" }}>
+              {/* FIXED: uses handleLogout from useLogout hook */}
+              <button onClick={handleLogout} style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #444", background: "white", cursor: "pointer", fontSize: "14px" }}>
                 Sign out
               </button>
             </div>
@@ -263,7 +265,8 @@ export default function AdminPage() {
             <div onClick={() => handleMenuClick("users", null, "view")} style={{ cursor: "pointer", padding: "8px", borderRadius: "4px", background: selectedSection === "users" ? "rgba(0,102,255,0.12)" : "transparent" }} title="Manage Users">
               <UsersIcon size={24} color={selectedSection === "users" ? "#0066ff" : "#333"} />
             </div>
-            <div onClick={logout} style={{ cursor: "pointer", padding: "8px" }} title="Sign out">
+            {/* FIXED: uses handleLogout from useLogout hook */}
+            <div onClick={handleLogout} style={{ cursor: "pointer", padding: "8px" }} title="Sign out">
               <LogOutIcon size={24} color="#333" />
             </div>
           </div>

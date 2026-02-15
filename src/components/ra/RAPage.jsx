@@ -1,5 +1,7 @@
+// src/pages/RAPage/RAPage.jsx
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import useLogout from "../../hooks/useLogout";
 import { uploadRoom } from "../../utils/api";
 
 const DORMS = [
@@ -24,7 +26,9 @@ function getErrorMessage(error) {
 }
 
 export default function RAPage() {
-  const { isAuthenticated, user, loading, logout } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+  const handleLogout = useLogout(); // FIXED: uses useLogout hook for secure logout
+
   const [dorm, setDorm] = useState("");
   const [room, setRoom] = useState("");
   const [notes, setNotes] = useState("");
@@ -44,7 +48,7 @@ export default function RAPage() {
   const [isEditingRAName, setIsEditingRAName] = useState(false);
 
   const uploadedByUserId = user?.username || user?.sub || "unknown";
-  
+
   const getAuthToken = () => {
     if (user?.id_token) return user.id_token;
     if (user?.idToken) return user.idToken;
@@ -79,10 +83,7 @@ export default function RAPage() {
       reader.readAsDataURL(file);
     });
 
-  // COMPLETELY REWRITTEN UPLOAD LOGIC
   const handleUpload = async () => {
-    console.log("=== UPLOAD STARTED ===");
-    
     if (!validateForm()) {
       setToast({ type: "error", message: "Fix errors before submitting" });
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -100,56 +101,39 @@ export default function RAPage() {
     setUploadProgress({ current: 0, total: files.length });
 
     try {
-      console.log(`Converting ${files.length} files to base64...`);
       const base64Images = await Promise.all(files.map(fileToBase64));
-      console.log("All files converted to base64");
-      
       const results = [];
       const failed = [];
-      
+
       for (let i = 0; i < base64Images.length; i++) {
-        console.log(`\n--- Uploading image ${i + 1} of ${base64Images.length} ---`);
         setUploadProgress({ current: i + 1, total: base64Images.length });
-        
         try {
-          // Build formData for THIS image
           const formData = {
-            dorm: dorm,
-            room: room,
-            notes: notes,
+            dorm,
+            room,
+            notes,
             imageBase64: base64Images[i],
-            uploadedByUserId: uploadedByUserId,
-            uploadedByName: uploadedByName,
-            residentName: residentName,
-            residentJNumber: residentJNumber,
-            residentEmail: residentEmail,
-            inspectionStatus: inspectionStatus,
+            uploadedByUserId,
+            uploadedByName,
+            residentName,
+            residentJNumber,
+            residentEmail,
+            inspectionStatus,
             maintenanceIssues: inspectionStatus === "Maintenance Concern" ? maintenanceIssues : [],
             failureReasons: inspectionStatus === "Failed" ? failureReasons : []
           };
-          
-          console.log(`Calling uploadRoom for image ${i + 1}`);
           const result = await uploadRoom(formData, authToken);
-          
-          console.log(`✓ Image ${i + 1} uploaded successfully:`, result);
           results.push(result);
-          
         } catch (error) {
-          console.error(`✗ Image ${i + 1} failed:`, error);
           failed.push({ index: i + 1, error: error.message });
         }
       }
-      
-      console.log("=== UPLOAD COMPLETE ===");
-      console.log(`Successful: ${results.length}, Failed: ${failed.length}`);
-      
+
       if (results.length > 0) {
-        setToast({ 
-          type: "success", 
-          message: `Successfully uploaded ${results.length} of ${files.length} image(s)!` 
+        setToast({
+          type: "success",
+          message: `Successfully uploaded ${results.length} of ${files.length} image(s)!`
         });
-        
-        // Reset form
         setDorm("");
         setRoom("");
         setNotes("");
@@ -162,19 +146,17 @@ export default function RAPage() {
         setFiles([]);
         setPreviews([]);
         setErrors({});
-        
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      
+
       if (failed.length > 0) {
-        const errorMsg = failed.length === files.length 
-          ? "All uploads failed. Try again." 
+        const errorMsg = failed.length === files.length
+          ? "All uploads failed. Try again."
           : `${failed.length} upload(s) failed`;
         setToast({ type: "error", message: errorMsg });
       }
-      
+
     } catch (err) {
-      console.error("Upload error:", err);
       setToast({ type: "error", message: getErrorMessage(err) });
     } finally {
       setUploading(false);
@@ -195,7 +177,6 @@ export default function RAPage() {
       }
       return true;
     });
-
     if (validFiles.length > 0) {
       setFiles(prev => [...prev, ...validFiles]);
       setPreviews(prev => [...prev, ...validFiles.map(f => URL.createObjectURL(f))]);
@@ -209,7 +190,7 @@ export default function RAPage() {
   };
 
   const toggleMaintenanceIssue = (issue) => {
-    setMaintenanceIssues(prev => 
+    setMaintenanceIssues(prev =>
       prev.includes(issue) ? prev.filter(i => i !== issue) : [...prev, issue]
     );
     if (errors.maintenanceIssues) setErrors(prev => ({ ...prev, maintenanceIssues: undefined }));
@@ -245,17 +226,15 @@ export default function RAPage() {
     );
   }
 
-  if (!isAuthenticated) {
-    window.location.href = "/login";
-    return null;
-  }
+  // ProtectedRoute handles redirect, keep as safety net
+  if (!isAuthenticated) return null;
 
   return (
     <div style={{ background: "#f7f7f7", minHeight: "100vh", padding: "16px" }}>
       <div style={{ maxWidth: "800px", margin: "0 auto" }}>
         <h1 style={{ textAlign: "center", fontSize: "clamp(24px, 5vw, 32px)", margin: "0 0 8px 0" }}>RA Dashboard</h1>
         <h2 style={{ textAlign: "center", color: "#555", fontSize: "clamp(16px, 4vw, 20px)", margin: "0 0 16px 0", fontWeight: "400" }}>RoomCheck Reporting</h2>
-        
+
         {toast && (
           <div style={{ padding: "12px", marginBottom: "16px", borderRadius: "6px", background: toast.type === "error" ? "#ffe5e5" : "#e5ffe8", border: toast.type === "error" ? "1px solid #ff9a9a" : "1px solid #8aff9a", color: toast.type === "error" ? "#c00" : "#0a0" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
@@ -264,10 +243,10 @@ export default function RAPage() {
             </div>
           </div>
         )}
-        
+
         <div style={{ background: "white", padding: "16px", borderRadius: "8px", marginBottom: "16px" }}>
           <p style={{ color: "#666", margin: "0 0 12px 0", fontSize: "14px" }}>Logged in as {user?.attributes?.email || user?.email || user?.username}</p>
-          
+
           {/* RA Name */}
           <div style={{ marginBottom: "16px" }}>
             <label style={{ display: "block", marginBottom: "6px", fontWeight: "500", fontSize: "14px" }}>Your Name (RA) <span style={{ color: "red" }}>*</span></label>
@@ -293,9 +272,9 @@ export default function RAPage() {
             )}
             {errors.uploadedByName && <p style={{ color: "#f44336", fontSize: "13px", marginTop: "4px", margin: "4px 0 0 0" }}>{errors.uploadedByName}</p>}
           </div>
-          
+
           <hr style={{ margin: "16px 0", border: "none", borderTop: "1px solid #e0e0e0" }} />
-          
+
           {/* Dorm */}
           <div style={{ marginBottom: "16px" }}>
             <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>Dorm <span style={{ color: "red" }}>*</span></label>
@@ -305,57 +284,57 @@ export default function RAPage() {
             </select>
             {errors.dorm && <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>{errors.dorm}</p>}
           </div>
-          
+
           {/* Room */}
           <div style={{ marginBottom: "16px" }}>
             <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>Room Number <span style={{ color: "red" }}>*</span></label>
             <input value={room} onChange={(e) => { setRoom(e.target.value); if (errors.room) setErrors(prev => ({ ...prev, room: undefined })); }} placeholder="e.g., 214E" style={{ width: "100%", padding: "10px", border: errors.room ? "2px solid #f44336" : "1px solid #ddd", borderRadius: "4px", fontSize: "16px", boxSizing: "border-box" }} />
             {errors.room && <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>{errors.room}</p>}
           </div>
-          
+
           {/* Resident Info */}
           <h3 style={{ margin: "20px 0 12px 0", fontSize: "18px" }}>Resident Information</h3>
-          
+
           <div style={{ marginBottom: "16px" }}>
             <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>Resident Name <span style={{ color: "red" }}>*</span></label>
             <input value={residentName} onChange={(e) => { setResidentName(e.target.value); if (errors.residentName) setErrors(prev => ({ ...prev, residentName: undefined })); }} placeholder="Full name" style={{ width: "100%", padding: "10px", border: errors.residentName ? "2px solid #f44336" : "1px solid #ddd", borderRadius: "4px", fontSize: "16px", boxSizing: "border-box" }} />
             {errors.residentName && <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>{errors.residentName}</p>}
           </div>
-          
+
           <div style={{ marginBottom: "16px" }}>
             <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>J-Number <span style={{ color: "red" }}>*</span></label>
             <input value={residentJNumber} onChange={(e) => { setResidentJNumber(e.target.value); if (errors.residentJNumber) setErrors(prev => ({ ...prev, residentJNumber: undefined })); }} placeholder="e.g., J12345" style={{ width: "100%", padding: "10px", border: errors.residentJNumber ? "2px solid #f44336" : "1px solid #ddd", borderRadius: "4px", fontSize: "16px", boxSizing: "border-box" }} />
             {errors.residentJNumber && <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>{errors.residentJNumber}</p>}
           </div>
-          
+
           <div style={{ marginBottom: "16px" }}>
             <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>Resident Email <span style={{ color: "red" }}>*</span></label>
             <input type="email" value={residentEmail} onChange={(e) => { setResidentEmail(e.target.value); if (errors.residentEmail) setErrors(prev => ({ ...prev, residentEmail: undefined })); }} placeholder="student@university.edu" style={{ width: "100%", padding: "10px", border: errors.residentEmail ? "2px solid #f44336" : "1px solid #ddd", borderRadius: "4px", fontSize: "16px", boxSizing: "border-box" }} />
             {errors.residentEmail && <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>{errors.residentEmail}</p>}
           </div>
-          
+
           {/* Inspection Status */}
           <h3 style={{ margin: "20px 0 8px 0", fontSize: "18px" }}>Inspection Status <span style={{ color: "red" }}>*</span></h3>
           {errors.inspectionStatus && <p style={{ color: "#f44336", fontSize: "13px", margin: "0 0 8px 0" }}>{errors.inspectionStatus}</p>}
-          
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px" }}>
             <div onClick={() => handleInspectionStatusChange("Passed")} style={{ padding: "16px", borderRadius: "8px", background: inspectionStatus === "Passed" ? "#4caf50" : "#c8e6c9", color: "white", cursor: "pointer", fontWeight: "bold" }}>
               <div style={{ fontSize: "16px", marginBottom: "6px" }}>Room Passed</div>
               <div style={{ fontSize: "13px", opacity: 0.9 }}>The room was found in good condition. No violations, no cleanliness issues, and no maintenance concerns were observed.</div>
             </div>
-            
+
             <div onClick={() => handleInspectionStatusChange("Failed")} style={{ padding: "16px", borderRadius: "8px", background: inspectionStatus === "Failed" ? "#f44336" : "#ffcdd2", color: "white", cursor: "pointer", fontWeight: "bold" }}>
               <div style={{ fontSize: "16px", marginBottom: "6px" }}>Room Failed</div>
               <div style={{ fontSize: "13px", opacity: 0.9 }}>The room was found in poor condition and did not meet the required cleanliness or safety standards.</div>
             </div>
-            
+
             <div onClick={() => handleInspectionStatusChange("Maintenance Concern")} style={{ padding: "16px", borderRadius: "8px", background: inspectionStatus === "Maintenance Concern" ? "#ff9800" : "#ffe0b2", color: "white", cursor: "pointer", fontWeight: "bold" }}>
               <div style={{ fontSize: "16px", marginBottom: "6px" }}>Maintenance Concern</div>
-              <div style={{ fontSize: "13px", opacity: 0.9 }}>The room requires maintenance attention. This may include mold,broken appliances, water damage, or HVAC issues.</div>
+              <div style={{ fontSize: "13px", opacity: 0.9 }}>The room requires maintenance attention. This may include mold, broken appliances, water damage, or HVAC issues.</div>
             </div>
           </div>
-          
-          {/* Conditional Fields */}
+
+          {/* Failure Reasons */}
           {inspectionStatus === "Failed" && (
             <div style={{ marginTop: "16px" }}>
               <h3 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>Failure Reasons <span style={{ color: "red" }}>*</span></h3>
@@ -372,7 +351,8 @@ export default function RAPage() {
               </div>
             </div>
           )}
-          
+
+          {/* Maintenance Issues */}
           {inspectionStatus === "Maintenance Concern" && (
             <div style={{ marginTop: "16px" }}>
               <h3 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>Maintenance Issues <span style={{ color: "red" }}>*</span></h3>
@@ -389,13 +369,13 @@ export default function RAPage() {
               </div>
             </div>
           )}
-          
+
           {/* Notes */}
           <div style={{ marginTop: "16px" }}>
             <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>Notes (Optional)</label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional comments..." style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "4px", minHeight: "80px", fontFamily: "inherit", fontSize: "14px", boxSizing: "border-box" }} />
           </div>
-          
+
           {/* File Upload */}
           <div style={{ marginTop: "16px" }}>
             <label style={{ fontWeight: "500", fontSize: "14px", display: "block", marginBottom: "6px" }}>Images <span style={{ color: "red" }}>*</span></label>
@@ -403,7 +383,7 @@ export default function RAPage() {
             {errors.files && <p style={{ color: "#f44336", fontSize: "13px", margin: "4px 0 0 0" }}>{errors.files}</p>}
             <p style={{ fontSize: "12px", color: "#666", margin: "4px 0 0 0" }}>Max 5MB per image</p>
           </div>
-          
+
           {/* Previews */}
           {previews.length > 0 && (
             <div style={{ marginTop: "16px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "10px" }}>
@@ -416,8 +396,8 @@ export default function RAPage() {
             </div>
           )}
         </div>
-        
-        {/* Progress */}
+
+        {/* Upload Progress */}
         {uploading && uploadProgress.total > 0 && (
           <div style={{ background: "white", padding: "16px", borderRadius: "8px", marginBottom: "12px", textAlign: "center" }}>
             <p style={{ marginBottom: "8px", color: "#666", fontSize: "14px", margin: "0 0 8px 0" }}>Uploading {uploadProgress.current} of {uploadProgress.total}...</p>
@@ -426,13 +406,16 @@ export default function RAPage() {
             </div>
           </div>
         )}
-        
-        {/* Buttons */}
+
+        {/* Upload Button */}
         <button onClick={handleUpload} disabled={uploading} style={{ width: "100%", padding: "14px", background: uploading ? "#999" : "#1976d2", color: "white", border: "none", borderRadius: "6px", cursor: uploading ? "not-allowed" : "pointer", fontSize: "16px", fontWeight: "500", boxSizing: "border-box" }}>
           {uploading ? "Uploading..." : "Upload"}
         </button>
-        
-        <button onClick={logout} style={{ width: "100%", marginTop: "12px", padding: "12px", border: "1px solid #444", background: "white", borderRadius: "6px", cursor: "pointer", fontSize: "14px", boxSizing: "border-box" }}>Sign out</button>
+
+        {/* FIXED: uses handleLogout from useLogout hook */}
+        <button onClick={handleLogout} style={{ width: "100%", marginTop: "12px", padding: "12px", border: "1px solid #444", background: "white", borderRadius: "6px", cursor: "pointer", fontSize: "14px", boxSizing: "border-box" }}>
+          Sign out
+        </button>
       </div>
     </div>
   );
