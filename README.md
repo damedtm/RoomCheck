@@ -142,9 +142,9 @@ A comprehensive web application for managing dorm room inspections, built with R
 ## Authentication & Authorization
 
 ### Cognito User Pool
-- **User Pool ID**: `us-east-2_lk1vd8Mwx`
-- **Identity Pool ID**: `us-east-2:0d00064d-9170-417c-862e-316009584b52`
-- **Region**: `us-east-2`
+- **User Pool ID**
+- **Identity Pool ID**
+- **Region**
 
 ### Authentication Flow
 ```
@@ -191,7 +191,7 @@ src/
 
 ### Base URL
 ```
-https://lsnro81xgl.execute-api.us-east-2.amazonaws.com/prod
+<API_BASE_URL>
 ```
 
 ### Endpoints
