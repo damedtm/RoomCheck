@@ -22,10 +22,10 @@ export default function ManageUsersTable() {
 
         const fetchedUsers = await getUsers(user.id_token);
 
-        console.log("✅ Users fetched:", fetchedUsers.length);
+        console.log(" Users fetched:", fetchedUsers.length);
         setUsers(fetchedUsers);
       } catch (err) {
-        console.error("❌ Error fetching users:", err);
+        console.error(" Error fetching users:", err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -60,18 +60,14 @@ export default function ManageUsersTable() {
      
       setUsers(prev => prev.filter(u => u.userId !== userId));
 
-      alert("✓ User deleted successfully");
+      alert("User deleted successfully");
     } catch (err) {
       console.error("Delete error:", err);
      
-      alert(`✗ Failed to delete user\n\n${err.message}`);
+      alert(`Failed to delete user\n\n${err.message}`);
     } finally {
       setDeleting(false);
     }
-  }
-
-  function handleEdit(targetUser) {
-    alert("Edit user feature coming soon");
   }
 
   if (authLoading || loading) {
@@ -192,17 +188,13 @@ export default function ManageUsersTable() {
                       </span>
                     </td>
                     <td style={tableCellStyle}>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        <button onClick={() => handleEdit(u)} style={buttonStyle}>Edit</button>
-                        <button
-                          
-                          onClick={() => handleDelete(u.userId, u.email)}
-                          disabled={deleting}
-                          style={{ ...dangerButtonStyle, opacity: deleting ? 0.6 : 1, cursor: deleting ? "not-allowed" : "pointer" }}
-                        >
-                          {deleting ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleDelete(u.userId, u.email)}
+                        disabled={deleting}
+                        style={{ ...dangerButtonStyle, opacity: deleting ? 0.6 : 1, cursor: deleting ? "not-allowed" : "pointer" }}
+                      >
+                        {deleting ? "Deleting..." : "Delete"}
+                      </button>
                     </td>
                   </tr>
                 ))}
