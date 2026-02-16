@@ -1,8 +1,7 @@
-// ViewUploads.jsx - UPDATED WITH IMAGE GROUPING
 import React, { useState } from "react";
 import { bulkDeleteUploads } from "../../utils/api";
 import { CONFIG } from "../../config/config";
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 export default function ViewUploads({ uploads, search, setSearch, page, setPage, PER_PAGE, onDelete, deleting, idToken }) {
@@ -18,20 +17,200 @@ export default function ViewUploads({ uploads, search, setSearch, page, setPage,
   const [statusFilter, setStatusFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
 
-  const groupUploadsByInspection = (uploads) => { const grouped = {}; uploads.forEach(upload => { const inspectionDate = new Date(upload.uploadedAt); const roundedDate = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate(), inspectionDate.getHours(), inspectionDate.getMinutes()).toISOString(); const key = `${upload.dorm}|${upload.room}|${upload.residentEmail}|${roundedDate}`; if (!grouped[key]) { grouped[key] = { ...upload, images: [{ imageUrl: upload.imageUrl, downloadUrl: upload.downloadUrl, imageKey: upload.imageKey, uploadedAt: upload.uploadedAt }], imageCount: 1, allUploads: [upload] }; } else { grouped[key].images.push({ imageUrl: upload.imageUrl, downloadUrl: upload.downloadUrl, imageKey: upload.imageKey, uploadedAt: upload.uploadedAt }); grouped[key].imageCount++; grouped[key].allUploads.push(upload); if (new Date(upload.uploadedAt) > new Date(grouped[key].uploadedAt)) { grouped[key].uploadedAt = upload.uploadedAt; } } }); return Object.values(grouped); };
-  const toggleSelectAll = () => { if (selectedItems.size === paginated.length) { setSelectedItems(new Set()); } else { setSelectedItems(new Set(paginated.map((_, idx) => idx))); } };
-  const toggleSelectItem = (index) => { const newSelected = new Set(selectedItems); if (newSelected.has(index)) { newSelected.delete(index); } else { newSelected.add(index); } setSelectedItems(newSelected); };
-  const handleBulkDelete = async () => { const itemsToDelete = paginated.filter((_, idx) => selectedItems.has(idx)); const allUploadsToDelete = itemsToDelete.flatMap(item => item.allUploads); if (allUploadsToDelete.length === 0) { alert("No items selected"); return; } const confirmed = window.confirm(`Are you sure you want to delete ${itemsToDelete.length} inspection(s)?\n\nThis will delete ${allUploadsToDelete.length} total image(s).\n\nThis action cannot be undone.`); if (!confirmed) return; setBulkDeleting(true); setBulkProgress({ current: 0, total: allUploadsToDelete.length }); try { const results = await bulkDeleteUploads(allUploadsToDelete, idToken, (progress) => setBulkProgress(progress)); if (results.failed.length > 0) { alert(`Bulk delete completed:\n\n✓ Successful: ${results.successful.length}\n✗ Failed: ${results.failed.length}\n\nFailed items:\n${results.failed.map(f => `- ${f.upload.dorm} ${f.upload.room}: ${f.error}`).join('\n')}`); } else { alert(`✓ Successfully deleted ${results.successful.length} image(s) from ${itemsToDelete.length} inspection(s)`); } window.location.reload(); } catch (err) { alert(`✗ Bulk delete failed\n\n${err.message}`); } finally { setBulkDeleting(false); setBulkProgress(null); setSelectedItems(new Set()); } };
-  const exportToPDF = () => { const doc = new jsPDF(); doc.setFontSize(18); doc.text('Room Inspection Report', 14, 20); doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28); doc.text(`Total Inspections: ${filtered.length}`, 14, 34); const tableData = filtered.map(u => [ u.dorm, u.room, u.inspectionStatus || 'Not Set', u.residentName || 'Unknown', u.uploadedByName || 'Unknown', new Date(u.uploadedAt).toLocaleDateString(), `${u.imageCount} image${u.imageCount > 1 ? 's' : ''}` ]); doc.autoTable({ startY: 40, head: [['Dorm', 'Room', 'Status', 'Resident', 'RA', 'Date', 'Images']], body: tableData, styles: { fontSize: 8 }, headStyles: { fillColor: [41, 128, 185] } }); doc.save(`inspection-report-${new Date().toISOString().split('T')[0]}.pdf`); };
-  const handleDeleteInspection = async (groupedUpload) => { const imageCount = groupedUpload.allUploads.length; if (!window.confirm(`Are you sure you want to delete the inspection for ${groupedUpload.dorm} Room ${groupedUpload.room}?\n\nThis will delete ${imageCount} image${imageCount > 1 ? 's' : ''}.\n\nThis action cannot be undone.`)) { return; } try { for (const upload of groupedUpload.allUploads) { await onDelete(upload); } alert(`✓ Successfully deleted ${imageCount} image${imageCount > 1 ? 's' : ''}`); window.location.reload(); } catch (err) { console.error("Delete failed:", err); alert("Failed to delete inspection: " + err.message); } };
-  const openImageGallery = (images, startIndex = 0) => { setModalImages(images); setCurrentImageIndex(startIndex); };
-  const closeImageGallery = () => { setModalImages(null); setCurrentImageIndex(0); };
-  const nextImage = () => { if (modalImages && currentImageIndex < modalImages.length - 1) { setCurrentImageIndex(currentImageIndex + 1); } };
-  const prevImage = () => { if (currentImageIndex > 0) { setCurrentImageIndex(currentImageIndex - 1); } };
+  const groupUploadsByInspection = (uploads) => { 
+    const grouped = {}; 
+    uploads.forEach(upload => { 
+      const inspectionDate = new Date(upload.uploadedAt); 
+      const roundedDate = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate(), inspectionDate.getHours(), inspectionDate.getMinutes()).toISOString(); 
+      const key = `${upload.dorm}|${upload.room}|${upload.residentEmail}|${roundedDate}`; 
+      if (!grouped[key]) { 
+        grouped[key] = { 
+          ...upload, 
+          images: [{ 
+            imageUrl: upload.imageUrl, 
+            downloadUrl: upload.downloadUrl, 
+            imageKey: upload.imageKey, 
+            uploadedAt: upload.uploadedAt 
+          }], 
+          imageCount: 1, 
+          allUploads: [upload] 
+        }; 
+      } else { 
+        grouped[key].images.push({ 
+          imageUrl: upload.imageUrl, 
+          downloadUrl: upload.downloadUrl, 
+          imageKey: upload.imageKey, 
+          uploadedAt: upload.uploadedAt 
+        }); 
+        grouped[key].imageCount++; 
+        grouped[key].allUploads.push(upload); 
+        if (new Date(upload.uploadedAt) > new Date(grouped[key].uploadedAt)) { 
+          grouped[key].uploadedAt = upload.uploadedAt; 
+        } 
+      } 
+    }); 
+    return Object.values(grouped); 
+  };
 
-  let filtered = groupUploadsByInspection(uploads).filter((u) => { const term = search.toLowerCase(); const matchesSearch = u.room?.toLowerCase().includes(term) || u.residentName?.toLowerCase().includes(term) || u.residentEmail?.toLowerCase().includes(term) || u.notes?.toLowerCase().includes(term); if (!matchesSearch) return false; if (statusFilter !== "all" && u.inspectionStatus !== statusFilter) { return false; } if (dateFrom && new Date(u.uploadedAt) < new Date(dateFrom)) { return false; } if (dateTo && new Date(u.uploadedAt) > new Date(dateTo + 'T23:59:59')) { return false; } return true; });
-  let sorted = [...filtered]; sorted.sort((a, b) => { if (sortInspection !== "none") { const aMatch = a.inspectionStatus === sortInspection ? 1 : 0; const bMatch = b.inspectionStatus === sortInspection ? 1 : 0; if (aMatch !== bMatch) { return bMatch - aMatch; } } const dateA = new Date(a.uploadedAt); const dateB = new Date(b.uploadedAt); return sortDate === "newest" ? dateB - dateA : dateA - dateB; });
-  const start = (page - 1) * PER_PAGE; const paginated = sorted.slice(start, start + PER_PAGE); const totalPages = Math.ceil(sorted.length / PER_PAGE);
+  const toggleSelectAll = () => { 
+    if (selectedItems.size === paginated.length) { 
+      setSelectedItems(new Set()); 
+    } else { 
+      setSelectedItems(new Set(paginated.map((_, idx) => idx))); 
+    } 
+  };
+
+  const toggleSelectItem = (index) => { 
+    const newSelected = new Set(selectedItems); 
+    if (newSelected.has(index)) { 
+      newSelected.delete(index); 
+    } else { 
+      newSelected.add(index); 
+    } 
+    setSelectedItems(newSelected); 
+  };
+
+  const handleBulkDelete = async () => { 
+    const itemsToDelete = paginated.filter((_, idx) => selectedItems.has(idx)); 
+    const allUploadsToDelete = itemsToDelete.flatMap(item => item.allUploads); 
+    if (allUploadsToDelete.length === 0) { 
+      alert("No items selected"); 
+      return; 
+    } 
+    const confirmed = window.confirm(`Are you sure you want to delete ${itemsToDelete.length} inspection(s)?\n\nThis will delete ${allUploadsToDelete.length} total image(s).\n\nThis action cannot be undone.`); 
+    if (!confirmed) return; 
+    setBulkDeleting(true); 
+    setBulkProgress({ current: 0, total: allUploadsToDelete.length }); 
+    try { 
+      const results = await bulkDeleteUploads(allUploadsToDelete, idToken, (progress) => setBulkProgress(progress)); 
+      if (results.failed.length > 0) { 
+        alert(`Bulk delete completed:\n\n✓ Successful: ${results.successful.length}\n✗ Failed: ${results.failed.length}\n\nFailed items:\n${results.failed.map(f => `- ${f.upload.dorm} ${f.upload.room}: ${f.error}`).join('\n')}`); 
+      } else { 
+        alert(`✓ Successfully deleted ${results.successful.length} image(s) from ${itemsToDelete.length} inspection(s)`); 
+      } 
+      window.location.reload(); 
+    } catch (err) { 
+      alert(`✗ Bulk delete failed\n\n${err.message}`); 
+    } finally { 
+      setBulkDeleting(false); 
+      setBulkProgress(null); 
+      setSelectedItems(new Set()); 
+    } 
+  };
+
+  const exportToPDF = () => { 
+    try {
+      const doc = new jsPDF(); 
+      
+      // Title
+      doc.setFontSize(18); 
+      doc.text('Room Inspection Report', 14, 20); 
+      
+      // Metadata
+      doc.setFontSize(10); 
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28); 
+      doc.text(`Total Inspections: ${filtered.length}`, 14, 34); 
+      
+      // Prepare table data
+      const tableData = filtered.map(u => [ 
+        u.dorm, 
+        u.room, 
+        u.inspectionStatus || 'Not Set', 
+        u.residentName || 'Unknown', 
+        u.uploadedByName || 'Unknown', 
+        new Date(u.uploadedAt).toLocaleDateString(), 
+        `${u.imageCount} image${u.imageCount > 1 ? 's' : ''}` 
+      ]); 
+      
+      // Generate table
+      doc.autoTable({ 
+        startY: 40, 
+        head: [['Dorm', 'Room', 'Status', 'Resident', 'RA', 'Date', 'Images']], 
+        body: tableData, 
+        styles: { fontSize: 8 }, 
+        headStyles: { fillColor: [41, 128, 185] } 
+      }); 
+      
+      // Save the PDF
+      doc.save(`inspection-report-${new Date().toISOString().split('T')[0]}.pdf`); 
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+      alert('Failed to generate PDF: ' + err.message);
+    }
+  };
+
+  const handleDeleteInspection = async (groupedUpload) => { 
+    const imageCount = groupedUpload.allUploads.length; 
+    if (!window.confirm(`Are you sure you want to delete the inspection for ${groupedUpload.dorm} Room ${groupedUpload.room}?\n\nThis will delete ${imageCount} image${imageCount > 1 ? 's' : ''}.\n\nThis action cannot be undone.`)) { 
+      return; 
+    } 
+    try { 
+      for (const upload of groupedUpload.allUploads) { 
+        await onDelete(upload); 
+      } 
+      alert(`✓ Successfully deleted ${imageCount} image${imageCount > 1 ? 's' : ''}`); 
+      window.location.reload(); 
+    } catch (err) { 
+      console.error("Delete failed:", err); 
+      alert("Failed to delete inspection: " + err.message); 
+    } 
+  };
+
+  const openImageGallery = (images, startIndex = 0) => { 
+    setModalImages(images); 
+    setCurrentImageIndex(startIndex); 
+  };
+
+  const closeImageGallery = () => { 
+    setModalImages(null); 
+    setCurrentImageIndex(0); 
+  };
+
+  const nextImage = () => { 
+    if (modalImages && currentImageIndex < modalImages.length - 1) { 
+      setCurrentImageIndex(currentImageIndex + 1); 
+    } 
+  };
+
+  const prevImage = () => { 
+    if (currentImageIndex > 0) { 
+      setCurrentImageIndex(currentImageIndex - 1); 
+    } 
+  };
+
+  let filtered = groupUploadsByInspection(uploads).filter((u) => { 
+    const term = search.toLowerCase(); 
+    const matchesSearch = u.room?.toLowerCase().includes(term) || u.residentName?.toLowerCase().includes(term) || u.residentEmail?.toLowerCase().includes(term) || u.notes?.toLowerCase().includes(term); 
+    if (!matchesSearch) return false; 
+    if (statusFilter !== "all" && u.inspectionStatus !== statusFilter) { 
+      return false; 
+    } 
+    if (dateFrom && new Date(u.uploadedAt) < new Date(dateFrom)) { 
+      return false; 
+    } 
+    if (dateTo && new Date(u.uploadedAt) > new Date(dateTo + 'T23:59:59')) { 
+      return false; 
+    } 
+    return true; 
+  });
+
+  let sorted = [...filtered]; 
+  sorted.sort((a, b) => { 
+    if (sortInspection !== "none") { 
+      const aMatch = a.inspectionStatus === sortInspection ? 1 : 0; 
+      const bMatch = b.inspectionStatus === sortInspection ? 1 : 0; 
+      if (aMatch !== bMatch) { 
+        return bMatch - aMatch; 
+      } 
+    } 
+    const dateA = new Date(a.uploadedAt); 
+    const dateB = new Date(b.uploadedAt); 
+    return sortDate === "newest" ? dateB - dateA : dateA - dateB; 
+  });
+
+  const start = (page - 1) * PER_PAGE; 
+  const paginated = sorted.slice(start, start + PER_PAGE); 
+  const totalPages = Math.ceil(sorted.length / PER_PAGE);
 
   return (
     <div style={{ width: "100%", overflowX: "auto" }}>
