@@ -197,6 +197,17 @@
   line-height: 1.45;
 }
 
+/* ── Success banner ──────────────────────────────────────────────────────── */
+.lp-success {
+  background: #e6f4ea;
+  border: 1px solid #c2e7cc;
+  border-radius: 6px;
+  padding: 16px 14px;
+  font-size: 13.5px;
+  color: #137333;
+  line-height: 1.45;
+}
+
 /* ── Password requirements ───────────────────────────────────────────────── */
 .lp-reqs {
   list-style: none;
@@ -277,6 +288,32 @@
   background: #e8eaed;
   color: #9aa0a6;
   cursor: not-allowed;
+}
+
+/* ── Link button (forgot password) ───────────────────────────────────────── */
+.lp-link-btn {
+  background: none;
+  border: none;
+  color: #1a73e8;
+  font-size: 14px;
+  font-weight: 400;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: center;
+  transition: all 0.15s;
+  margin-top: 12px;
+}
+
+.lp-link-btn:hover {
+  color: #1557b0;
+  text-decoration: underline;
+}
+
+.lp-link-btn:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* ── Spinner ─────────────────────────────────────────────────────────────── */

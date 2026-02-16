@@ -109,7 +109,6 @@ export function AuthProvider({ children }) {
           reject(err);
         },
 
-       
         newPasswordRequired: (userAttributes) => {
           console.log('AuthProvider: New password required');
           setAuth(prev => ({
@@ -125,7 +124,6 @@ export function AuthProvider({ children }) {
     });
   };
 
-  
   const completePasswordChange = async (newPassword) => {
     return new Promise((resolve, reject) => {
       const { pendingCognitoUser, pendingUserAttributes } = auth;
@@ -135,7 +133,6 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      
       const cleanAttributes = { ...pendingUserAttributes };
       delete cleanAttributes.email_verified;
       delete cleanAttributes.email;
@@ -168,6 +165,56 @@ export function AuthProvider({ children }) {
           console.error('AuthProvider: Password change failed:', err);
           reject(err);
         }
+      });
+    });
+  };
+
+  
+  const checkUserExists = async (email) => {
+    return true;
+  };
+
+  
+  const forgotPassword = async (email) => {
+    return new Promise((resolve, reject) => {
+      const cognitoUser = new CognitoUser({
+        Username: email,
+        Pool: userPool,
+      });
+
+      cognitoUser.forgotPassword({
+        onSuccess: (data) => {
+          console.log('AuthProvider: Password reset code sent:', data);
+          resolve(data);
+        },
+        onFailure: (err) => {
+          console.error('AuthProvider: Forgot password error:', err);
+          reject(err);
+        },
+        inputVerificationCode: (data) => {
+          console.log('AuthProvider: Code delivery confirmed:', data);
+          resolve(data);
+        }
+      });
+    });
+  };
+
+  const confirmPasswordReset = async (email, verificationCode, newPassword) => {
+    return new Promise((resolve, reject) => {
+      const cognitoUser = new CognitoUser({
+        Username: email,
+        Pool: userPool,
+      });
+
+      cognitoUser.confirmPassword(verificationCode, newPassword, {
+        onSuccess: () => {
+          console.log('AuthProvider: Password reset successful');
+          resolve();
+        },
+        onFailure: (err) => {
+          console.error('AuthProvider: Password reset confirmation failed:', err);
+          reject(err);
+        },
       });
     });
   };
@@ -211,7 +258,10 @@ export function AuthProvider({ children }) {
       login,
       logout,
       refreshSession,
-      completePasswordChange
+      completePasswordChange,
+      forgotPassword,
+      confirmPasswordReset,
+      checkUserExists
     }}>
       {children}
     </AuthContext.Provider>

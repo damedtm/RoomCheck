@@ -251,11 +251,11 @@ export const getUsers = async (idToken) => {
     } else if (data.users && Array.isArray(data.users)) {
       return data.users;
     } else {
-      console.warn('⚠️ Unexpected response format:', data);
+      console.warn('Unexpected response format:', data);
       return [];
     }
   } catch (error) {
-    console.error('❌ Get users error:', error);
+    console.error('Get users error:', error);
     throw new Error(error.message || 'Failed to fetch users');
   }
 };
@@ -263,7 +263,7 @@ export const getUsers = async (idToken) => {
 
 export const deleteUser = async (userId, email, idToken) => {
   try {
-    console.log('🗑️ Deleting user:', { userId, email });
+    console.log('Deleting user:', { userId, email });
 
     const response = await apiCall(`${API_BASE_URL}${config.api.endpoints.deleteUser}`, {
       method: 'DELETE',
