@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { bulkDeleteUploads } from "../../utils/api";
 import { CONFIG } from "../../config/config";
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function ViewUploads({ uploads, search, setSearch, page, setPage, PER_PAGE, onDelete, deleting, idToken }) {
   const [sortInspection, setSortInspection] = useState("none");
@@ -16,6 +16,7 @@ export default function ViewUploads({ uploads, search, setSearch, page, setPage,
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   const groupUploadsByInspection = (uploads) => { 
     const grouped = {}; 
@@ -98,47 +99,6 @@ export default function ViewUploads({ uploads, search, setSearch, page, setPage,
     } 
   };
 
-  const exportToPDF = () => { 
-    try {
-      const doc = new jsPDF(); 
-      
-      // Title
-      doc.setFontSize(18); 
-      doc.text('Room Inspection Report', 14, 20); 
-      
-      // Metadata
-      doc.setFontSize(10); 
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28); 
-      doc.text(`Total Inspections: ${filtered.length}`, 14, 34); 
-      
-      // Prepare table data
-      const tableData = filtered.map(u => [ 
-        u.dorm, 
-        u.room, 
-        u.inspectionStatus || 'Not Set', 
-        u.residentName || 'Unknown', 
-        u.uploadedByName || 'Unknown', 
-        new Date(u.uploadedAt).toLocaleDateString(), 
-        `${u.imageCount} image${u.imageCount > 1 ? 's' : ''}` 
-      ]); 
-      
-      // Generate table
-      doc.autoTable({ 
-        startY: 40, 
-        head: [['Dorm', 'Room', 'Status', 'Resident', 'RA', 'Date', 'Images']], 
-        body: tableData, 
-        styles: { fontSize: 8 }, 
-        headStyles: { fillColor: [41, 128, 185] } 
-      }); 
-      
-      // Save the PDF
-      doc.save(`inspection-report-${new Date().toISOString().split('T')[0]}.pdf`); 
-    } catch (err) {
-      console.error('PDF Export Error:', err);
-      alert('Failed to generate PDF: ' + err.message);
-    }
-  };
-
   const handleDeleteInspection = async (groupedUpload) => { 
     const imageCount = groupedUpload.allUploads.length; 
     if (!window.confirm(`Are you sure you want to delete the inspection for ${groupedUpload.dorm} Room ${groupedUpload.room}?\n\nThis will delete ${imageCount} image${imageCount > 1 ? 's' : ''}.\n\nThis action cannot be undone.`)) { 
@@ -154,6 +114,172 @@ export default function ViewUploads({ uploads, search, setSearch, page, setPage,
       console.error("Delete failed:", err); 
       alert("Failed to delete inspection: " + err.message); 
     } 
+  };
+
+  const exportToPDF = async () => { 
+    try {
+      setExportingPDF(true);
+      const doc = new jsPDF(); 
+      
+      // PAGE 1: Title and Summary Table
+      doc.setFontSize(18); 
+      doc.text('Room Inspection Report', 14, 20); 
+      
+      doc.setFontSize(10); 
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28); 
+      doc.text(`Total Inspections: ${filtered.length}`, 14, 34); 
+      
+      // Summary table
+      const tableData = filtered.map(u => [ 
+        u.dorm || '', 
+        u.room || '', 
+        u.inspectionStatus || 'Not Set', 
+        u.residentName || 'Unknown', 
+        u.uploadedByName || 'Unknown', 
+        new Date(u.uploadedAt).toLocaleDateString(), 
+        `${u.imageCount}`
+      ]); 
+      
+      autoTable(doc, { 
+        startY: 40, 
+        head: [['Dorm', 'Room', 'Status', 'Resident', 'RA', 'Date', 'Photos']], 
+        body: tableData, 
+        styles: { fontSize: 8 }, 
+        headStyles: { fillColor: [41, 128, 185] },
+        margin: { bottom: 20 }
+      }); 
+      
+      // Add page break before images
+      doc.addPage();
+      
+      // PAGE 2+: Images section
+      doc.setFontSize(16);
+      doc.text('Inspection Photos', 14, 20);
+      
+      let yPosition = 30;
+      
+      for (const inspection of filtered) {
+        // Check if we need a new page for the header
+        if (yPosition > 270) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        // Inspection header
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(`${inspection.dorm} - Room ${inspection.room}`, 14, yPosition);
+        yPosition += 6;
+        
+        // Details
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Resident: ${inspection.residentName || 'Unknown'} | RA: ${inspection.uploadedByName || 'Unknown'} | Status: ${inspection.inspectionStatus || 'Not Set'}`, 14, yPosition);
+        yPosition += 5;
+        
+        if (inspection.notes) {
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          const splitNotes = doc.splitTextToSize(`Notes: ${inspection.notes}`, 180);
+          doc.text(splitNotes, 14, yPosition);
+          yPosition += splitNotes.length * 4;
+          doc.setTextColor(0, 0, 0);
+        }
+        
+        yPosition += 3;
+        
+        // Add images for this inspection
+        for (let i = 0; i < inspection.images.length; i++) {
+          const img = inspection.images[i];
+          
+          try {
+            // Check if we need a new page for the image
+            if (yPosition > 200) {
+              doc.addPage();
+              yPosition = 20;
+            }
+            
+            // USE DOWNLOAD URL (signed URL) instead of regular imageUrl
+            const imageUrl = img.downloadUrl || img.imageUrl;
+            
+            console.log(`Fetching image ${i + 1}:`, imageUrl);
+            
+            const response = await fetch(imageUrl);
+            
+            if (!response.ok) {
+              throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+            }
+            
+            const blob = await response.blob();
+            
+            // Verify it's an image
+            if (!blob.type.startsWith('image/')) {
+              throw new Error(`Invalid content type: ${blob.type}`);
+            }
+            
+            // Convert to base64
+            const base64 = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.onerror = () => reject(new Error('FileReader failed'));
+              reader.readAsDataURL(blob);
+            });
+            
+            // Determine image format
+            const format = blob.type.includes('png') ? 'PNG' : 'JPEG';
+            
+            // Add image to PDF
+            const imgWidth = 85;
+            const imgHeight = 65;
+            
+            doc.addImage(base64, format, 14, yPosition, imgWidth, imgHeight);
+            
+            // Image label
+            doc.setFontSize(7);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Photo ${i + 1}/${inspection.images.length}`, 14, yPosition + imgHeight + 3);
+            doc.setTextColor(0, 0, 0);
+            
+            yPosition += imgHeight + 8;
+            
+          } catch (err) {
+            console.error(`Failed to add image ${i + 1}:`, err);
+            console.error('Image object:', img);
+            
+            doc.setFontSize(8);
+            doc.setTextColor(255, 0, 0);
+            doc.text(`[Photo ${i + 1} failed to load]`, 14, yPosition);
+            doc.setFontSize(6);
+            doc.text(`Error: ${err.message}`, 14, yPosition + 3);
+            doc.setTextColor(0, 0, 0);
+            yPosition += 10;
+          }
+        }
+        
+        // Add separator between inspections
+        doc.setDrawColor(220, 220, 220);
+        doc.line(14, yPosition, 196, yPosition);
+        yPosition += 8;
+      }
+      
+      // Add page numbers
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+      }
+      
+      // Save the PDF
+      doc.save(`inspection-report-with-photos-${new Date().toISOString().split('T')[0]}.pdf`); 
+      
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+      alert('Failed to generate PDF: ' + err.message);
+    } finally {
+      setExportingPDF(false);
+    }
   };
 
   const openImageGallery = (images, startIndex = 0) => { 
@@ -232,7 +358,8 @@ export default function ViewUploads({ uploads, search, setSearch, page, setPage,
       </div>
       {CONFIG.FEATURES.BULK_DELETE && selectedItems.size > 0 && (<div style={{ background: "#e3f2fd", padding: 12, borderRadius: 6, marginBottom: 15, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ fontSize: 14, fontWeight: 500 }}>{selectedItems.size} inspection(s) selected</span><div style={{ display: "flex", gap: 10 }}><button onClick={() => setSelectedItems(new Set())} style={{ padding: "6px 12px", borderRadius: 4, border: "1px solid #ccc", background: "white", cursor: "pointer", fontSize: 13 }}>Clear Selection</button><button onClick={handleBulkDelete} disabled={bulkDeleting} style={{ padding: "6px 12px", borderRadius: 4, border: "none", background: bulkDeleting ? "#9ca3af" : "#dc2626", color: "white", cursor: bulkDeleting ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500 }}>{bulkDeleting ? "Deleting..." : "Delete Selected"}</button></div></div>)}
       {bulkProgress && (<div style={{ background: "white", padding: 16, borderRadius: 8, marginBottom: 15, textAlign: "center" }}><p style={{ marginBottom: 8, color: "#666", fontSize: 14 }}>Deleting {bulkProgress.current} of {bulkProgress.total}...</p><div style={{ width: "100%", height: 8, background: "#e0e0e0", borderRadius: 4, overflow: "hidden" }}><div style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%`, height: "100%", background: "#1976d2", transition: "width 0.3s ease" }}></div></div></div>)}
-      <div style={{ marginBottom: 15, display: "flex", justifyContent: "flex-end", gap: 10 }}><button onClick={exportToPDF} disabled={filtered.length === 0} style={{ padding: "8px 16px", background: filtered.length === 0 ? "#ccc" : "#e74c3c", color: "white", border: "none", borderRadius: 6, cursor: filtered.length === 0 ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500 }}>Export to PDF ({filtered.length})</button></div>
+      {exportingPDF && (<div style={{ background: "white", padding: 16, borderRadius: 8, marginBottom: 15, textAlign: "center" }}><p style={{ marginBottom: 8, color: "#666", fontSize: 14 }}>Generating PDF with photos... This may take a moment.</p><div style={{ width: "100%", height: 8, background: "#e0e0e0", borderRadius: 4, overflow: "hidden" }}><div style={{ width: "100%", height: "100%", background: "#e74c3c", animation: "pulse 1.5s ease-in-out infinite" }}></div></div><style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style></div>)}
+      <div style={{ marginBottom: 15, display: "flex", justifyContent: "flex-end", gap: 10 }}><button onClick={exportToPDF} disabled={filtered.length === 0 || exportingPDF} style={{ padding: "8px 16px", background: (filtered.length === 0 || exportingPDF) ? "#ccc" : "#e74c3c", color: "white", border: "none", borderRadius: 6, cursor: (filtered.length === 0 || exportingPDF) ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 500 }}>{exportingPDF ? "Generating PDF..." : `Export to PDF (${filtered.length})`}</button></div>
       <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 10px", minWidth: "1000px" }}><thead><tr style={{ textAlign: "left", fontWeight: 600 }}>{CONFIG.FEATURES.BULK_DELETE && (<th style={{ padding: 12 }}><input type="checkbox" checked={selectedItems.size === paginated.length && paginated.length > 0} onChange={toggleSelectAll} style={{ cursor: "pointer", width: 16, height: 16 }} /></th>)}<th style={{ padding: 12 }}>Actions</th><th style={{ padding: 12 }}>RA</th><th style={{ padding: 12 }}>Dorm</th><th style={{ padding: 12 }}>Room</th><th style={{ padding: 12 }}>Resident</th><th style={{ padding: 12 }}>Inspection</th><th style={{ padding: 12 }}>Issues</th><th style={{ padding: 12 }}>Images</th><th style={{ padding: 12 }}>Notes</th><th style={{ padding: 12 }}>Uploaded</th></tr></thead><tbody>{paginated.map((u, index) => (<tr key={index} style={{ background: selectedItems.has(index) ? "#e3f2fd" : "white", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>{CONFIG.FEATURES.BULK_DELETE && (<td style={{ padding: 12 }}><input type="checkbox" checked={selectedItems.has(index)} onChange={() => toggleSelectItem(index)} style={{ cursor: "pointer", width: 16, height: 16 }} /></td>)}<td style={{ padding: 12 }}><div style={{ display: "flex", flexDirection: "column", gap: 6, width: 120 }}><button onClick={() => openImageGallery(u.images, 0)} style={{ padding: "6px 10px", background: "#2563eb", color: "white", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>View Images ({u.imageCount})</button><button onClick={() => handleDeleteInspection(u)} disabled={deleting} style={{ padding: "6px 10px", background: deleting ? "#9ca3af" : "#dc2626", color: "white", borderRadius: 4, border: "none", cursor: deleting ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 500 }}>{deleting ? "Deleting..." : "Delete"}</button></div></td><td style={{ padding: 12 }}>{u.uploadedByName || "Unknown"}</td><td style={{ padding: 12 }}>{u.dorm}</td><td style={{ padding: 12 }}>{u.room}</td><td style={{ padding: 12 }}><div style={{ fontWeight: 600 }}>{u.residentName}</div><div style={{ fontSize: 12, color: "#555" }}>{u.residentEmail}</div><div style={{ fontSize: 12, color: "#777" }}>{u.residentJNumber}</div></td><td style={{ padding: 12 }}><span style={{ padding: "6px 12px", borderRadius: 6, background: u.inspectionStatus === "Passed" ? "#16a34a22" : u.inspectionStatus === "Failed" ? "#dc262622" : "#f59e0b22", color: u.inspectionStatus === "Passed" ? "#166534" : u.inspectionStatus === "Failed" ? "#991b1b" : "#92400e", fontWeight: 600, fontSize: 13, display: "inline-block" }}>{u.inspectionStatus || "Not Set"}</span></td><td style={{ padding: 12 }}>{u.maintenanceIssues && u.maintenanceIssues.length > 0 ? u.maintenanceIssues.join(", ") : "None"}</td><td style={{ padding: 12 }}><div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{u.images.slice(0, 3).map((img, imgIdx) => (<div key={imgIdx} onClick={() => openImageGallery(u.images, imgIdx)} style={{ width: 50, height: 50, borderRadius: 4, overflow: "hidden", cursor: "pointer", border: "2px solid #e0e0e0", position: "relative" }}><img src={img.imageUrl} alt={`Thumbnail ${imgIdx + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>))}{u.imageCount > 3 && (<div onClick={() => openImageGallery(u.images, 0)} style={{ width: 50, height: 50, borderRadius: 4, background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#666" }}>+{u.imageCount - 3}</div>)}</div></td><td style={{ padding: 12, maxWidth: 200 }}>{u.notes || "-"}</td><td style={{ padding: 12, whiteSpace: "nowrap" }}>{new Date(u.uploadedAt).toLocaleString()}</td></tr>))}</tbody></table></div>
       {paginated.length === 0 && (<div style={{ background: "white", padding: 40, borderRadius: 8, textAlign: "center", color: "#666" }}><p style={{ fontSize: 16, margin: 0 }}>{search || dateFrom || dateTo || statusFilter !== "all" ? "No results found for your filters." : "No uploads yet."}</p></div>)}
       {totalPages > 1 && (<div style={{ marginTop: 20, display: "flex", justifyContent: "center", gap: 10, alignItems: "center" }}><button disabled={page === 1} onClick={() => setPage(page - 1)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ccc", background: page === 1 ? "#eee" : "white", cursor: page === 1 ? "not-allowed" : "pointer", fontSize: 14 }}>Prev</button><span style={{ padding: "8px 12px", fontSize: 14 }}>Page {page} of {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage(page + 1)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid #ccc", background: page === totalPages ? "#eee" : "white", cursor: page === totalPages ? "not-allowed" : "pointer", fontSize: 14 }}>Next</button></div>)}
