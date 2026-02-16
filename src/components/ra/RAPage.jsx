@@ -1,7 +1,8 @@
 // src/pages/RAPage/RAPage.jsx
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import useLogout from "../../hooks/useLogout";
+import useDebounce from "../../hooks/useDebounce";
 import { uploadRoom } from "../../utils/api";
 
 const DORMS = [
@@ -83,7 +84,8 @@ export default function RAPage() {
       reader.readAsDataURL(file);
     });
 
-  const handleUpload = async () => {
+  // Wrapped in useCallback so useDebounce gets a stable reference
+  const uploadFn = useCallback(async () => {
     if (!validateForm()) {
       setToast({ type: "error", message: "Fix errors before submitting" });
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -162,7 +164,12 @@ export default function RAPage() {
       setUploading(false);
       setUploadProgress({ current: 0, total: 0 });
     }
-  };
+  }, [dorm, room, notes, files, uploadedByUserId, uploadedByName, residentName,
+      residentJNumber, residentEmail, inspectionStatus, maintenanceIssues, failureReasons]);
+
+  // useDebounce wraps uploadFn — blocks re-calls within 2 seconds
+  // and blocks entirely while an upload is already in progress
+  const handleUpload = useDebounce(uploadFn, 2000);
 
   const handleFileChange = (e) => {
     const selected = [...e.target.files];
@@ -226,7 +233,6 @@ export default function RAPage() {
     );
   }
 
-  
   if (!isAuthenticated) return null;
 
   return (
@@ -322,12 +328,10 @@ export default function RAPage() {
               <div style={{ fontSize: "16px", marginBottom: "6px" }}>Room Passed</div>
               <div style={{ fontSize: "13px", opacity: 0.9 }}>The room was found in good condition. No violations, no cleanliness issues, and no maintenance concerns were observed.</div>
             </div>
-
             <div onClick={() => handleInspectionStatusChange("Failed")} style={{ padding: "16px", borderRadius: "8px", background: inspectionStatus === "Failed" ? "#f44336" : "#ffcdd2", color: "white", cursor: "pointer", fontWeight: "bold" }}>
               <div style={{ fontSize: "16px", marginBottom: "6px" }}>Room Failed</div>
               <div style={{ fontSize: "13px", opacity: 0.9 }}>The room was found in poor condition and did not meet the required cleanliness or safety standards.</div>
             </div>
-
             <div onClick={() => handleInspectionStatusChange("Maintenance Concern")} style={{ padding: "16px", borderRadius: "8px", background: inspectionStatus === "Maintenance Concern" ? "#ff9800" : "#ffe0b2", color: "white", cursor: "pointer", fontWeight: "bold" }}>
               <div style={{ fontSize: "16px", marginBottom: "6px" }}>Maintenance Concern</div>
               <div style={{ fontSize: "13px", opacity: 0.9 }}>The room requires maintenance attention. This may include mold, broken appliances, water damage, or HVAC issues.</div>
@@ -408,12 +412,18 @@ export default function RAPage() {
         )}
 
         {/* Upload Button */}
-        <button onClick={handleUpload} disabled={uploading} style={{ width: "100%", padding: "14px", background: uploading ? "#999" : "#1976d2", color: "white", border: "none", borderRadius: "6px", cursor: uploading ? "not-allowed" : "pointer", fontSize: "16px", fontWeight: "500", boxSizing: "border-box" }}>
+        <button
+          onClick={handleUpload}
+          disabled={uploading}
+          style={{ width: "100%", padding: "14px", background: uploading ? "#999" : "#1976d2", color: "white", border: "none", borderRadius: "6px", cursor: uploading ? "not-allowed" : "pointer", fontSize: "16px", fontWeight: "500", boxSizing: "border-box" }}
+        >
           {uploading ? "Uploading..." : "Upload"}
         </button>
 
-       
-        <button onClick={handleLogout} style={{ width: "100%", marginTop: "12px", padding: "12px", border: "1px solid #444", background: "white", borderRadius: "6px", cursor: "pointer", fontSize: "14px", boxSizing: "border-box" }}>
+        <button
+          onClick={handleLogout}
+          style={{ width: "100%", marginTop: "12px", padding: "12px", border: "1px solid #444", background: "white", borderRadius: "6px", cursor: "pointer", fontSize: "14px", boxSizing: "border-box" }}
+        >
           Sign out
         </button>
       </div>
