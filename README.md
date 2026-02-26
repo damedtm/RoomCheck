@@ -463,7 +463,7 @@ You may not use, copy, or distribute this code without permission.
 
 ## Contributors
 
-[This project was built by a team of myself and the grace of God]
+[This project was built by my myself]
 
 ## Support
 
